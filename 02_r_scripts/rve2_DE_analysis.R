@@ -108,10 +108,6 @@ h18_simple_repressed <- get_consistent_DE(h18_simple, h18_repressed, rve2_T16, C
 h21_simple_repressed <- get_consistent_DE(h21_simple, h21_repressed, rve2_T17, Col_T17)
 h24_simple_repressed <- get_consistent_DE(h24_simple, h24_repressed, rve2_T18, Col_T18)
 
-# h0_simple_repressed <- h0_simple %>% 
-#   mutate(h0_repressed = rve2_T9/Col_T9) %>% 
-#   dplyr::select(Isoform, h0_repressed)
-
 # bind repressed together
 repressed_simple <- bind_cols(h0_simple_repressed,
                               h3_simple_repressed,
@@ -124,10 +120,6 @@ repressed_simple <- bind_cols(h0_simple_repressed,
                               h21_simple_repressed,
                               h24_simple_repressed) %>% 
   dplyr::select(1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
-
-RVE1_repressed_simple <- repressed_simple %>% filter(Isoform %in% 'AT5G17300_P1')
-RVE7_repressed_simple <- repressed_simple %>% filter(Isoform %in% 'AT1G18330_P1')
-CBF1_repressed_simple <- repressed_simple %>% filter(Isoform %in% 'AT4G25490.1')
 
 # rename first column
 colnames(repressed_simple)[1] ="Isoform"
@@ -163,8 +155,7 @@ colnames(activated_simple)[1] ="Isoform"
 
 # 1.3 consistent DE----
 # *1.3.1 consistent repressed----
-# CBF1 <- repressed_simple_flagged %>% 
-#   filter(Isoform %in% 'AT4G25490.1')
+
 repressed_simple_flagged <- repressed_simple %>%
   mutate(consistent_h0_to_h6 = case_when(h0_repressed > 1.2 & h3_repressed > 1.2 & h6_repressed > 1.2 ~ 1, TRUE ~ 0),
          consistent_h3_to_h9 = case_when((h3_repressed > 1.2 | h6_repressed > 1.2) & h7_5_repressed > 1.2 & h9_repressed > 1.2 ~ 1, TRUE ~ 0),
@@ -173,16 +164,6 @@ repressed_simple_flagged <- repressed_simple %>%
          consistent_h12_to_h18 = case_when(h12_repressed > 1.2 & h15_repressed > 1.2 & h18_repressed > 1.2  ~ 1, TRUE ~ 0),
          consistent_h15_to_h21 = case_when(h15_repressed > 1.2 & h18_repressed > 1.2 & h21_repressed > 1.2  ~ 1, TRUE ~ 0),
          consistent_h18_to_h24 = case_when(h18_repressed > 1.2 & h21_repressed > 1.2 & h24_repressed > 1.2  ~ 1, TRUE ~ 0))
-
-repressed_simple_flagged_new <- repressed_simple %>%
-  mutate(consistent_h0_to_h6 = case_when(h0_repressed > 1.2 & h3_repressed > 1.2 & h6_repressed > 1.2 ~ 1, TRUE ~ 0),
-         consistent_h6_to_h12 = case_when((h6_repressed > 1.2 | h7_5_repressed > 1.2) & h9_repressed > 1.2 & h12_repressed > 1.2  ~ 1, TRUE ~ 0),
-         consistent_h12_to_h18 = case_when(h12_repressed > 1.2 & h15_repressed > 1.2 & h18_repressed > 1.2  ~ 1, TRUE ~ 0),
-         consistent_h18_to_h24 = case_when(h18_repressed > 1.2 & h21_repressed > 1.2 & h24_repressed > 1.2  ~ 1, TRUE ~ 0))
-
-CBF1_repressed_simple_flagged_new <- repressed_simple_flagged_new %>% filter(Isoform %in% 'AT4G25490.1')
-CBF2_repressed_simple_flagged_new <- repressed_simple_flagged_new %>% filter(Isoform %in% 'AT4G25470_P1')
-CBF3_repressed_simple_flagged_new <- repressed_simple_flagged_new %>% filter(Isoform %in% 'AT4G25480_JC1')
 
 # *1.3.2 consistent activated----
 
@@ -193,12 +174,6 @@ activated_simple_flagged <- activated_simple %>%
          consistent_h9_to_h15 = case_when(h9_activated > 1.2 & h12_activated > 1.2 & h15_activated > 1.2  ~ 1, TRUE ~ 0),
          consistent_h12_to_h18 = case_when(h12_activated > 1.2 & h15_activated > 1.2 & h18_activated > 1.2  ~ 1, TRUE ~ 0),
          consistent_h15_to_h21 = case_when(h15_activated > 1.2 & h18_activated > 1.2 & h21_activated > 1.2  ~ 1, TRUE ~ 0),
-         consistent_h18_to_h24 = case_when(h18_activated > 1.2 & h21_activated > 1.2 & h24_activated > 1.2  ~ 1, TRUE ~ 0))
-
-activated_simple_flagged_new <- activated_simple %>%
-  mutate(consistent_h0_to_h6 = case_when(h0_activated > 1.2 & h3_activated > 1.2 & h6_activated > 1.2 ~ 1, TRUE ~ 0),
-         consistent_h6_to_h12 = case_when((h6_activated > 1.2 | h7_5_activated > 1.2) & h9_activated > 1.2 & h12_activated > 1.2  ~ 1, TRUE ~ 0),
-         consistent_h12_to_h18 = case_when(h12_activated > 1.2 & h15_activated > 1.2 & h18_activated > 1.2  ~ 1, TRUE ~ 0),
          consistent_h18_to_h24 = case_when(h18_activated > 1.2 & h21_activated > 1.2 & h24_activated > 1.2  ~ 1, TRUE ~ 0))
 
 # *1.4 consistent DE ranked----
@@ -230,64 +205,44 @@ consistent_h0_to_h6_ranked_rep <- get_consistent_windows(repressed_simple_flagge
                                                          h0_rank, h3_rank, h6_rank,
                                                          h0_repressed, h3_repressed, h6_repressed,
                                                          mean_rank_h0_to_h6) %>% 
-  write_csv('consistent_h0_to_h6_ranked_rep.csv')
-
-consistent_h0_to_h6_ranked_rep %>% filter(Isoform %in% 'AT4G25490.1')
+  write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_rep.csv')
 
 consistent_h3_to_h9_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h3_to_h9, 
                                                          h3_rank, h6_rank, h9_rank,
                                                          h3_repressed, h6_repressed, h9_repressed,
                                                          mean_rank_h3_to_h9) %>% 
-  write_csv('consistent_h3_to_h9_ranked_rep.csv')
-
-#consistent_h3_to_h9_ranked_rep %>% filter(Isoform %in% 'AT4G25490.1')
+  write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_rep.csv')
 
 consistent_h6_to_h12_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h6_to_h12, 
                                                           h6_rank, h9_rank, h12_rank,
                                                           h6_repressed, h9_repressed, h12_repressed,
                                                           mean_rank_h6_to_h12) %>% 
-  write_csv('consistent_h6_to_h12_ranked_rep.csv')
+  write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_rep.csv')
 
 consistent_h9_to_h15_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h9_to_h15, 
                                                           h9_rank, h12_rank, h15_rank,
                                                           h9_repressed, h12_repressed, h15_repressed,
                                                           mean_rank_h9_to_h15) %>% 
-  write_csv('consistent_h9_to_h15_ranked_rep.csv')
-
-#consistent_h9_to_h15_ranked_rep %>% filter(Isoform %in% 'AT4G25490.1')
+  write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_rep.csv')
 
 consistent_h12_to_h18_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h12_to_h18, 
                                                            h12_rank, h15_rank, h18_rank,
                                                            h12_repressed, h15_repressed, h18_repressed,
                                                            mean_rank_h12_to_h18) %>% 
-  write_csv('consistent_h12_to_h18_ranked_rep.csv')
+  write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_rep.csv')
 
 consistent_h15_to_h21_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h15_to_h21, 
                                                            h15_rank, h18_rank, h21_rank,
                                                            h15_repressed, h18_repressed, h21_repressed,
                                                            mean_rank_h15_to_h21) %>% 
-  write_csv('consistent_h15_to_h21_ranked_rep.csv')
+  write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_rep.csv')
 
 consistent_h18_to_h24_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h18_to_h24, 
                                                            h18_rank, h21_rank, h24_rank,
                                                            h18_repressed, h21_repressed, h24_repressed,
                                                            mean_rank_h18_to_h24) %>% 
-  write_csv('consistent_h18_to_h24_ranked_rep.csv')
+  write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_rep.csv')
 
-#repressed
-#h0_h6
-# consistent_h0_to_h6_ranked_rep <- repressed_simple_flagged %>% 
-#   filter(consistent_h0_to_h6 == 1)%>%
-#   mutate(h0_rank = dense_rank(dplyr::desc(h0_repressed)),
-#          h3_rank = dense_rank(dplyr::desc(h3_repressed)),
-#          h6_rank = dense_rank(dplyr::desc(h6_repressed)))
-# 
-# consistent_h0_to_h6_ranked_rep <- consistent_h0_to_h6_ranked_rep %>%
-#   mutate(mean_rank_h0_to_h6 = rowMeans(cbind(h0_rank, h3_rank, h6_rank))) %>%
-#   arrange(mean_rank_h0_to_h6)
-# 
-# consistent_h0_to_h6_ranked_rep <- consistent_h0_to_h6_ranked_rep %>%
-#   dplyr::select(Isoform, mean_rank_h0_to_h6)
 
 # *1.4.2 consistent activated ranked----
 
@@ -295,59 +250,44 @@ consistent_h0_to_h6_ranked_act <- get_consistent_windows(activated_simple_flagge
                                                          h0_rank, h3_rank, h6_rank,
                                                          h0_activated, h3_activated, h6_activated,
                                                          mean_rank_h0_to_h6) %>% 
-  write_csv('consistent_h0_to_h6_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_act.csv')
 
 consistent_h3_to_h9_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h3_to_h9, 
                                                          h3_rank, h6_rank, h9_rank,
                                                          h3_activated, h6_activated, h9_activated,
                                                          mean_rank_h3_to_h9) %>% 
-  write_csv('consistent_h3_to_h9_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_act.csv')
 
 consistent_h6_to_h12_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h6_to_h12, 
                                                           h6_rank, h9_rank, h12_rank,
                                                           h6_activated, h9_activated, h12_activated,
                                                           mean_rank_h6_to_h12) %>% 
-  write_csv('consistent_h6_to_h12_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_act.csv')
 
 consistent_h9_to_h15_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h9_to_h15, 
                                                           h9_rank, h12_rank, h15_rank,
                                                           h9_activated, h12_activated, h15_activated,
                                                           mean_rank_h9_to_h15) %>% 
-  write_csv('consistent_h9_to_h15_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_act.csv')
 
 consistent_h12_to_h18_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h12_to_h18, 
                                                            h12_rank, h15_rank, h18_rank,
                                                            h12_activated, h15_activated, h18_activated,
                                                            mean_rank_h12_to_h18) %>% 
-  write_csv('consistent_h12_to_h18_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_act.csv')
 
 consistent_h15_to_h21_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h15_to_h21, 
                                                            h15_rank, h18_rank, h21_rank,
                                                            h15_activated, h18_activated, h21_activated,
                                                            mean_rank_h15_to_h21) %>% 
-  write_csv('consistent_h15_to_h21_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_act.csv')
 
 consistent_h18_to_h24_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h18_to_h24, 
                                                            h18_rank, h21_rank, h24_rank,
                                                            h18_activated, h21_activated, h24_activated,
                                                            mean_rank_h18_to_h24) %>% 
-  write_csv('consistent_h18_to_h24_ranked_act.csv')
+  write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_act.csv')
 
-#ranking of targets in 6hr windows----
-#activated
-#h0_h6
-# consistent_h0_to_h6_ranked_act <- activated_simple_flagged %>% 
-#   filter(consistent_h0_to_h6 == 1)%>%
-#   mutate(h0_rank = dense_rank(dplyr::desc(h0_activated)),
-#          h3_rank = dense_rank(dplyr::desc(h3_activated)),
-#          h6_rank = dense_rank(dplyr::desc(h6_activated)))
-# 
-# consistent_h0_to_h6_ranked_act <- consistent_h0_to_h6_ranked_act %>%
-#   mutate(mean_rank_h0_to_h6 = rowMeans(cbind(h0_rank, h3_rank, h6_rank))) %>%
-#   arrange(mean_rank_h0_to_h6)
-# 
-# consistent_h0_to_h6_ranked_act <- consistent_h0_to_h6_ranked_act %>%
-#   dplyr::select(Isoform, mean_rank_h0_to_h6)
 
 # *1.5 split the isoform tag----
 
@@ -413,22 +353,6 @@ h12_to_h18_tags_count_act <- count_isoforms(h12_to_h18_tags_act, tags, percent, 
 h15_to_h21_tags_count_act <- count_isoforms(h15_to_h21_tags_act, tags, percent, rank, group)
 h18_to_h24_tags_count_act <- count_isoforms(h18_to_h24_tags_act, tags, percent, rank, group)
 
-# Isoforms_consistent_h0_to_h6_ranked_rep <- consistent_h0_to_h6_ranked_rep %>% 
-#   dplyr::select(Isoform)
-# 
-# h0_to_h6_tags_rep <- Isoforms_consistent_h0_to_h6_ranked_rep %>%
-#   mutate(tag1 = str_split(Isoform, "_", simplify = TRUE)[ ,2],
-#          tag2 = str_split(Isoform, "[.]", simplify = TRUE)[ ,2]) %>% 
-#   unite(tag, c("tag1", "tag2"), sep="") 
-
-# h0_to_h6_tags_count_rep <- h0_to_h6_tags_rep %>%
-#   count(tags) %>% 
-#   mutate(percent = round((n/sum(n)*100), 1))
-# 
-# h0_to_h6_tags_count_plotting_data_rep <- h0_to_h6_tags_count_rep %>% 
-#   mutate(rank = rank(-percent),
-#          group = ifelse(percent >= 5, tags, 'Others'))
-
 # *1.7 Waffle plot prep----
 
 prep_waffle_plot <- function(df, new_col_str1) {
@@ -454,7 +378,6 @@ h15_to_h21_rep_waffle_prep <- prep_waffle_plot(h15_to_h21_tags_count_rep, sum_is
 h18_to_h24_rep_waffle_prep <- prep_waffle_plot(h18_to_h24_tags_count_rep, sum_isoforms)
 
 # activated
-
 h0_to_h6_act_waffle_prep <- prep_waffle_plot(h0_to_h6_tags_count_act, sum_isoforms)
 h3_to_h9_act_waffle_prep <- prep_waffle_plot(h3_to_h9_tags_count_act, sum_isoforms)
 h6_to_h12_act_waffle_prep <- prep_waffle_plot(h6_to_h12_tags_count_act, sum_isoforms)
@@ -462,13 +385,6 @@ h9_to_h15_act_waffle_prep <- prep_waffle_plot(h9_to_h15_tags_count_act, sum_isof
 h12_to_h18_act_waffle_prep <- prep_waffle_plot(h12_to_h18_tags_count_act, sum_isoforms)
 h15_to_h21_act_waffle_prep <- prep_waffle_plot(h15_to_h21_tags_count_act, sum_isoforms)
 h18_to_h24_act_waffle_prep <- prep_waffle_plot(h18_to_h24_tags_count_act, sum_isoforms)
-
-# h0_to_h6_tags_count_plotting_data_waffle_rep <- h0_to_h6_tags_count_plotting_data_rep %>% 
-#   mutate(group = factor(group)) %>% 
-#   mutate(group = fct_relevel(group, c("Others", "1", "P2", "P1"))) %>%
-#   arrange(group) %>% 
-#   group_by(group) %>%
-#   summarise(sum_isoforms = sum(n))
 
 # *1.8 Waffle plot prep----
 
