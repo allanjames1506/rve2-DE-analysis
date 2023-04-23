@@ -1,6 +1,6 @@
 # rve2-DE-analysis
 Differential expression analysis of rve2-2/Col-0 RNA-seq transcript isoform data
 
-This is a line from RStudio
+Code used for Differential Expression of transcript isoforms between rve2-2 and Col-0 in a temperature and time series RNA-seq experiment
 
-This is a line from GitHub
+Manuscript title: 'REVEILLE2 Thermosensitive Splicing: A Molecular Basis for the Integration of Nocturnal Temperature Information by the Arabidopsis Circadian Clock'
