@@ -19,6 +19,7 @@ library(clusterProfiler)
 library(ggplot2)
 library(GOplot)
 library(org.At.tair.db)
+library(glue)
 
 # 1. RNAseq dataset----
 # Temperature & time series RNA-seq experiment
@@ -426,60 +427,37 @@ h12_to_h18_act_waffle <- plot_waffle(h12_to_h18_rep_waffle_prep, "h12 to h18")
 h15_to_h21_act_waffle <- plot_waffle(h15_to_h21_rep_waffle_prep, "h15 to h21")
 h18_to_h24_act_waffle <- plot_waffle(h18_to_h24_rep_waffle_prep, "h18 to h24")
 
-ggplot(h0_to_h6_tags_count_plotting_data_waffle_rep, aes(fill = group, values = sum_isoforms)) +
-  geom_waffle(n_rows = 4, size = 0.2, colour = "grey30", flip = TRUE, make_proportional = TRUE) +
-  scale_fill_manual(name = NULL,
-                    values = c('#bf5b17','#beaed4','#386cb0','#7fc97f')) +
-  coord_equal() +
-  theme_void() +
-  guides(fill = guide_legend(reverse = TRUE, title = "Isoform")) +
-  ggtitle('h0 to h6', subtitle = '(n = 93)') +
-  theme(plot.title = element_text(size = 12, hjust = 0.5),
-        plot.subtitle = element_text(size = 10, hjust = 0.5),
-        legend.position = "left",
-        legend.key.size = unit(0.5, 'cm'))
-
-ggsave('waffle_h0_to_h6_rep.png', height = 4, width = 1.8, units = 'in')
-
-write_csv(Isoforms_consistent_h0_to_h6_ranked_rep, 'Isoforms_consistent_h0_to_h6_ranked_rep.csv')
-
 # 1.9 Odds ratio tile maps ----
+
+# requires data from the Calixto et al TF clusters
+
+# 7302 gene loci grouped in 75 clusters (0-74); error in row 5772
+TF_network_clusters <- read_csv('./00_raw_data/TF Network Cluster Nov2018 long format.csv') %>%
+  filter(!row_number() %in% 5772)
+
+# count of gene loci in each TF cluster
+TF_network_clusters_count <-  TF_network_clusters %>% 
+  group_by(cluster) %>%
+  summarise(cluster_number = n())
 
 # *1.9.1 repressed h0 to h15----
 # combine consistent groups
 repressed_h0_to_h15 <- bind_rows(h0_to_h6_tags_rep, h3_to_h9_tags_rep, h6_to_h12_tags_rep, h9_to_h15_tags_rep) %>%
   dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(repressed_h0_to_h15, 'repressed_h0_to_h15_isoforms.csv')
-
-repressed_h0_to_h12_new <- bind_rows(h0_to_h6_tags_rep, h6_to_h12_tags_rep) %>%
-  dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(repressed_h0_to_h12_new, 'repressed_h0_to_h12_new_isoforms.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/repressed_h0_to_h15_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 
 repressed_h0_to_h15_AGI <- repressed_h0_to_h15 %>% 
   mutate(gene_ID = substr(Isoform, start = 1, stop = 9))
 
-repressed_h0_to_h12_new_AGI <- repressed_h0_to_h12_new %>% 
-  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) 
-
 # select just the AGI and reduce to distinct AGI
 
 repressed_h0_to_h15_AGI_distinct <- repressed_h0_to_h15_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(repressed_h0_to_h15_AGI_distinct, 'repressed_h0_to_h15_AGI_distinct.csv')
-
-repressed_h0_to_h12_new_AGI_distinct <- repressed_h0_to_h12_new_AGI %>%
-  dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(repressed_h0_to_h12_new_AGI_distinct, 'repressed_h0_to_h12_new_AGI_distinct.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/repressed_h0_to_h15_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h0_h15_distinct_rep <- inner_join(TF_network_clusters, repressed_h0_to_h15_AGI_distinct)
@@ -519,9 +497,8 @@ rep_h0_h15_fishers_pval <- rep_h0_h15_fishers_p %>%
 
 rep_inner_join_clusters_h0_h15_distinct_count_Odds_pval <- inner_join_clusters_h0_h15_distinct_rep_count %>% 
   bind_cols(rep_h0_h15_fishers_Odds, rep_h0_h15_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(rep_inner_join_clusters_h0_h15_distinct_count_Odds_pval, 'h0_h15_repressed_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) %>% 
+  write_csv('./01_tidy_data/h0_h15_repressed_odds_p_val.csv')
 
 rep_h0_h15_odds_heatmap1 <- rep_inner_join_clusters_h0_h15_distinct_count_Odds_pval %>%
   mutate(time_points = "early") %>% 
@@ -533,7 +510,6 @@ rep_h0_h15_odds_heatmap1 <- rep_inner_join_clusters_h0_h15_distinct_count_Odds_p
 
 rep_h0_h15_odds_heatmap2 <- rep_h0_h15_odds_heatmap1 %>% 
   ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
-  #ggplot(aes(x = cluster, y= time_points, fill= Enrichfactor))+
   geom_tile(colour="grey30",size=0.3, width = 2.5) +
   guides(fill=guide_legend(title="Enrichment")) +
   labs(x="",y="Cluster") +
@@ -554,131 +530,27 @@ rep_h0_h15_odds_heatmap2 <- rep_h0_h15_odds_heatmap1 %>%
         axis.ticks = element_line(size = 0.4),
         plot.background = element_blank(),
         panel.border = element_blank())
-#       #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-#       plot.title = element_text(colour = 'grey30', size = 10, face = "bold", hjust = 1)) + 
-# ggtitle('Repressed in Col-0') 
 
-rep_h0_h15_odds_heatmap2
-
-#ggsave(rep_h0_h15_odds_heatmap2, filename="rep_h0_h15_odds_heatmap2.png",height=9,width=3,units="in",dpi=200)
-
-# rep h0 to h12----
-
-# associate with a TFcluster number
-inner_join_clusters_h0_h12_distinct_rep <- inner_join(TF_network_clusters, repressed_h0_to_h12_new_AGI_distinct)
-
-inner_join_clusters_h0_h12_distinct_rep_count <- inner_join_clusters_h0_h12_distinct_rep %>%
-  group_by(cluster) %>%
-  count(cluster) %>%
-  ungroup() %>% 
-  mutate(percent = round((n/sum(n)*100), 1)) %>%
-  complete(.,cluster = 0:74, fill = list(n = 0, percent = 0)) %>% 
-  inner_join(., TF_network_clusters_count) 
-
-rep_h0_h12_fishers_prep <- inner_join_clusters_h0_h12_distinct_rep_count %>% 
-  mutate(fishers_col2 = sum(n) - n,
-         fishers_col4 = sum(cluster_number) - cluster_number) %>% 
-  dplyr::select(n, cluster_number, fishers_col2, fishers_col4) %>% 
-  dplyr::rename(fishers_col1 = n,
-                fishers_col3 = cluster_number) %>% 
-  relocate(fishers_col2, .after = fishers_col1)
-
-rep_h0_h12_fishers <- rep_h0_h12_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$estimate))
-
-colnames(rep_h0_h12_fishers)[5] <- "Odds_Ratio"
-
-rep_h0_h12_fishers_p <- rep_h0_h12_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$p.value)) 
-
-colnames(rep_h0_h12_fishers_p)[5] <- "p_value"
-
-rep_h0_h12_fishers_Odds <- rep_h0_h12_fishers %>% 
-  dplyr::select(Odds_Ratio) %>% 
-  round(2)
-
-rep_h0_h12_fishers_pval <- rep_h0_h12_fishers_p %>% 
-  dplyr::select(p_value)
-
-rep_inner_join_clusters_h0_h12_distinct_count_Odds_pval <- inner_join_clusters_h0_h12_distinct_rep_count %>% 
-  bind_cols(rep_h0_h12_fishers_Odds, rep_h0_h12_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(rep_inner_join_clusters_h0_h12_distinct_count_Odds_pval, 'h0_h12_repressed_odds_p_val.csv')
-
-rep_h0_h12_odds_heatmap1 <- rep_inner_join_clusters_h0_h12_distinct_count_Odds_pval %>%
-  mutate(time_points = "h0 to h12") %>% 
-  dplyr::select(cluster, Odds_Ratio, time_points) %>% 
-  mutate(cluster=factor(cluster),
-         time_points =factor(time_points),
-         Enrichfactor=cut(Odds_Ratio, breaks=c(-1, 1, 2.5, 5, 7.5, max(Odds_Ratio)), labels=c("0-1","1-2.5","2.5-5","5-7.5",">7.5")),
-         Enrichfactor=factor(as.character(Enrichfactor),levels=rev(levels(Enrichfactor))))
-
-rep_h0_h12_odds_heatmap2 <- rep_h0_h12_odds_heatmap1 %>% 
-  ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
-  #ggplot(aes(x = cluster, y= time_points, fill= Enrichfactor))+
-  geom_tile(colour="grey30",size=0.3, width = 2.5) +
-  guides(fill=guide_legend(title="Enrichment")) +
-  labs(x="",y="Cluster") +
-  scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
-  scale_x_discrete(expand=c(0,0)) +
-  scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c')), drop = FALSE) +
-  coord_fixed(ratio=0.75) +
-  theme_grey() +
-  theme(legend.position = "right",legend.direction = "vertical",
-        legend.title = element_text(colour = 'grey30', size = 10),
-        legend.margin = margin(grid::unit(0,"cm")),
-        legend.text = element_text(colour = 'grey30',size = 10),
-        legend.key.height = grid::unit(0.4,"cm"),
-        legend.key.width = grid::unit(0.4,"cm"),
-        axis.text.x = element_text(size = 10,colour = 'grey30',angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = element_text(size = 10, vjust = 0.2,colour = 'grey30'),
-        axis.ticks = element_line(size = 0.4),
-        plot.background = element_blank(),
-        panel.border = element_blank(),
-        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-        plot.title = element_text(colour = 'grey30', size = 10, face = "bold", hjust = 0.5)) + 
-  ggtitle('Repressed in Col-0') 
-
-rep_h0_h12_odds_heatmap2
-
-ggsave(rep_h0_h12_odds_heatmap2, filename="rep_h0_h12_odds_heatmap2.png",height=9,width=3,units="in",dpi=200)
+ggsave(rep_h0_h15_odds_heatmap2, filename="./03_plots/rep_h0_h15_odds_heatmap2.png",height=9,width=3,units="in",dpi=200)
 
 
 # *1.9.2 activated h0 to h15----
 
 activated_h0_to_h15 <- bind_rows(h0_to_h6_tags_act, h3_to_h9_tags_act, h6_to_h12_tags_act, h9_to_h15_tags_act) %>%
   dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(activated_h0_to_h15, 'activated_h0_to_h15_isoforms.csv')
-
-activated_h0_to_h12 <- bind_rows(h0_to_h6_tags_act, h6_to_h12_tags_act) %>%
-  dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(activated_h0_to_h12, 'activated_h0_to_h12_isoforms.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/activated_h0_to_h15_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 activated_h0_to_h15_AGI <- activated_h0_to_h15 %>% 
   mutate(gene_ID = substr(Isoform, start = 1, stop = 9))
 
-activated_h0_to_h12_AGI <- activated_h0_to_h12 %>% 
-  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) 
-
 # select just the AGI and reduce to distinct AGI
 
 activated_h0_to_h15_AGI_distinct <- activated_h0_to_h15_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(activated_h0_to_h15_AGI_distinct, 'activated_h0_to_h15_AGI_distinct.csv')
-
-activated_h0_to_h12_AGI_distinct <- activated_h0_to_h12_AGI %>%
-  dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(activated_h0_to_h12_AGI_distinct, 'activated_h0_to_h12_AGI_distinct.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/activated_h0_to_h15_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h0_h15_distinct_act <- inner_join(TF_network_clusters, activated_h0_to_h15_AGI_distinct)
@@ -718,9 +590,8 @@ act_h0_h15_fishers_pval <- act_h0_h15_fishers_p %>%
 
 act_inner_join_clusters_h0_h15_distinct_count_Odds_pval <- inner_join_clusters_h0_h15_distinct_act_count %>% 
   bind_cols(act_h0_h15_fishers_Odds, act_h0_h15_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(act_inner_join_clusters_h0_h15_distinct_count_Odds_pval, 'h0_h15_activated_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) %>% 
+  write_csv('./01_tidy_data/h0_h15_activated_odds_p_val.csv')
 
 act_h0_h15_odds_heatmap1 <- act_inner_join_clusters_h0_h15_distinct_count_Odds_pval %>%
   mutate(time_points = "early") %>% 
@@ -734,7 +605,6 @@ act_h0_h15_odds_heatmap2 <- act_h0_h15_odds_heatmap1 %>%
   ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
   geom_tile(colour="grey30",size=0.3, width = 2.5) +
   guides(fill=guide_legend(title="Enrichment")) +
-  #labs(x="",y="Cluster") +
   scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
   scale_x_discrete(expand=c(0,0)) +
   scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8'))) +
@@ -748,130 +618,25 @@ act_h0_h15_odds_heatmap2 <- act_h0_h15_odds_heatmap1 %>%
         axis.ticks = element_line(size = 0.4),
         plot.background = element_blank(),
         panel.border = element_blank())
-#plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-#       plot.title = element_text(colour = 'grey30', size = 10, face = "bold", hjust = 0.5),
-#       axis.title.x = element_blank()) + 
-# ggtitle('Activated in Col-0')
-# scale_fill_manual(values=rev(brewer.pal(4, "YlGnBu")))
-act_h0_h15_odds_heatmap2
 
-#ggsave(act_h0_h15_odds_heatmap2, filename="act_h0_h15_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
-
-# act h0 to h12----
-
-# associate with a TFcluster number
-inner_join_clusters_h0_h12_distinct_act <- inner_join(TF_network_clusters, activated_h0_to_h12_AGI_distinct)
-
-inner_join_clusters_h0_h12_distinct_act_count <- inner_join_clusters_h0_h12_distinct_act %>%
-  group_by(cluster) %>%
-  count(cluster) %>%
-  ungroup() %>% 
-  mutate(percent = round((n/sum(n)*100), 1)) %>%
-  complete(.,cluster = 0:74, fill = list(n = 0, percent = 0)) %>% 
-  inner_join(., TF_network_clusters_count) 
-
-act_h0_h12_fishers_prep <- inner_join_clusters_h0_h12_distinct_act_count %>% 
-  mutate(fishers_col2 = sum(n) - n,
-         fishers_col4 = sum(cluster_number) - cluster_number) %>% 
-  dplyr::select(n, cluster_number, fishers_col2, fishers_col4) %>% 
-  dplyr::rename(fishers_col1 = n,
-                fishers_col3 = cluster_number) %>% 
-  relocate(fishers_col2, .after = fishers_col1)
-
-act_h0_h12_fishers <- act_h0_h12_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$estimate))
-
-colnames(act_h0_h12_fishers)[5] <- "Odds_Ratio"
-
-act_h0_h12_fishers_p <- act_h0_h12_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$p.value)) 
-
-colnames(act_h0_h12_fishers_p)[5] <- "p_value"
-
-act_h0_h12_fishers_Odds <- act_h0_h12_fishers %>% 
-  dplyr::select(Odds_Ratio) %>% 
-  round(2)
-
-act_h0_h12_fishers_pval <- act_h0_h12_fishers_p %>% 
-  dplyr::select(p_value)
-
-act_inner_join_clusters_h0_h12_distinct_count_Odds_pval <- inner_join_clusters_h0_h12_distinct_act_count %>% 
-  bind_cols(act_h0_h12_fishers_Odds, act_h0_h12_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(act_inner_join_clusters_h0_h12_distinct_count_Odds_pval, 'h0_h12_activated_odds_p_val.csv')
-
-act_h0_h12_odds_heatmap1 <- act_inner_join_clusters_h0_h12_distinct_count_Odds_pval %>%
-  mutate(time_points = "h0 to h12") %>% 
-  dplyr::select(cluster, Odds_Ratio, time_points) %>% 
-  mutate(cluster=factor(cluster),
-         time_points =factor(time_points),
-         Enrichfactor=cut(Odds_Ratio, breaks=c(-1, 1, 2.5, 5, 7.5, max(Odds_Ratio)), labels=c("0-1","1-2.5","2.5-5","5-7.5",">7.5")),
-         Enrichfactor=factor(as.character(Enrichfactor),levels=rev(levels(Enrichfactor))))
-
-act_h0_h12_odds_heatmap2 <- act_h0_h12_odds_heatmap1 %>% 
-  ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
-  geom_tile(colour="grey30",size=0.3, width = 2.5) +
-  guides(fill=guide_legend(title="Enrichment")) +
-  #labs(x="",y="Cluster") +
-  scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
-  scale_x_discrete(expand=c(0,0)) +
-  scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c')), drop = FALSE) +
-  coord_fixed(ratio=0.75) +
-  theme_grey() +
-  theme(legend.position = "right",legend.direction = "vertical",
-        legend.title = element_text(colour = 'grey30', size = 10),
-        legend.margin = margin(grid::unit(0,"cm")),
-        legend.text = element_text(colour = 'grey30',size = 10),
-        legend.key.height = grid::unit(0.4,"cm"),
-        legend.key.width = grid::unit(0.4,"cm"),
-        axis.text.x = element_text(size = 10,colour = 'grey30',angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = element_text(size = 10, vjust = 0.2,colour = 'grey30'),
-        axis.ticks = element_line(size = 0.4),
-        plot.background = element_blank(),
-        panel.border = element_blank(),
-        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-        plot.title = element_text(colour = 'grey30', size = 10, face = "bold", hjust = 0.5),
-        axis.title.x = element_blank()) + 
-  ggtitle('Activated in Col-0')
-# scale_fill_manual(values=rev(brewer.pal(4, "YlGnBu")))
-act_h0_h12_odds_heatmap2
-
-ggsave(act_h0_h12_odds_heatmap2, filename="act_h0_h12_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
+ggsave(act_h0_h15_odds_heatmap2, filename="./03_plots/act_h0_h15_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
 
 # *1.9.3 repressed h9 to h24----
 repressed_h9_to_h24 <- bind_rows(h9_to_h15_tags_rep, h12_to_h18_tags_rep, h15_to_h21_tags_rep, h18_to_h24_tags_rep) %>%
   dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(repressed_h9_to_h24, 'repressed_h9_to_h24_isoforms.csv')
-
-repressed_h12_to_h24 <- bind_rows(h12_to_h18_tags_rep, h18_to_h24_tags_rep) %>%
-  dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(repressed_h12_to_h24, 'repressed_h12_to_h24_isoforms.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/repressed_h9_to_h24_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 repressed_h9_to_h24_AGI <- repressed_h9_to_h24 %>% 
-  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) 
-
-repressed_h12_to_h24_AGI <- repressed_h12_to_h24 %>% 
   mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) 
 
 # select just the AGI and reduce to distinct AGI
 
 repressed_h9_to_h24_AGI_distinct <- repressed_h9_to_h24_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(repressed_h9_to_h24_AGI_distinct, 'repressed_h9_to_h24_AGI_distinct.csv')
-
-repressed_h12_to_h24_AGI_distinct <- repressed_h12_to_h24_AGI %>%
-  dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(repressed_h12_to_h24_AGI_distinct, 'repressed_h12_to_h24_AGI_distinct.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/repressed_h9_to_h24_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h9_h24_distinct_rep <- inner_join(TF_network_clusters, repressed_h9_to_h24_AGI_distinct)
@@ -911,11 +676,8 @@ rep_h9_h24_fishers_pval <- rep_h9_h24_fishers_p %>%
 
 rep_inner_join_clusters_h9_h24_distinct_count_Odds_pval <- inner_join_clusters_h9_h24_distinct_rep_count %>% 
   bind_cols(rep_h9_h24_fishers_Odds, rep_h9_h24_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(rep_inner_join_clusters_h9_h24_distinct_count_Odds_pval, 'h9_h24_repressed_odds_p_val.csv')
-
-filter(rep_inner_join_clusters_h9_h24_distinct_count_Odds_pval, Odds_Ratio >= 5)
+  dplyr::rename(number_in_cluster = n) %>% 
+  write_csv('./01_tidy_data/h9_h24_repressed_odds_p_val.csv')
 
 rep_h9_h24_odds_heatmap1 <- rep_inner_join_clusters_h9_h24_distinct_count_Odds_pval %>%
   mutate(time_points = "late") %>% 
@@ -946,132 +708,28 @@ rep_h9_h24_odds_heatmap2 <- rep_h9_h24_odds_heatmap1 %>%
         axis.ticks = element_line(size = 0.4),
         plot.background = element_blank(),
         panel.border = element_blank(),
-        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-        #plot.title = element_text(colour = 'grey30', size = 10, face = "bold"),
         axis.title.x = element_blank(),
         axis.title.y = element_blank())
 
-rep_h9_h24_odds_heatmap2
+ggsave(rep_h9_h24_odds_heatmap2, filename="./03_plots/rep_h9_h24_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
 
-#ggsave(rep_h9_h24_odds_heatmap2, filename="rep_h9_h24_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
-
-# rep h12 to h24----
-
-# associate with a TFcluster number
-inner_join_clusters_h12_h24_distinct_rep <- inner_join(TF_network_clusters, repressed_h12_to_h24_AGI_distinct)
-
-inner_join_clusters_h12_h24_distinct_rep_count <- inner_join_clusters_h12_h24_distinct_rep %>%
-  group_by(cluster) %>%
-  count(cluster) %>%
-  ungroup() %>% 
-  mutate(percent = round((n/sum(n)*100), 1)) %>%
-  complete(.,cluster = 0:74, fill = list(n = 0, percent = 0)) %>% 
-  inner_join(., TF_network_clusters_count) 
-
-rep_h12_h24_fishers_prep <- inner_join_clusters_h12_h24_distinct_rep_count %>% 
-  mutate(fishers_col2 = sum(n) - n,
-         fishers_col4 = sum(cluster_number) - cluster_number) %>% 
-  dplyr::select(n, cluster_number, fishers_col2, fishers_col4) %>% 
-  dplyr::rename(fishers_col1 = n,
-                fishers_col3 = cluster_number) %>% 
-  relocate(fishers_col2, .after = fishers_col1)
-
-rep_h12_h24_fishers <- rep_h12_h24_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$estimate))
-
-colnames(rep_h12_h24_fishers)[5] <- "Odds_Ratio"
-
-rep_h12_h24_fishers_p <- rep_h12_h24_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$p.value)) 
-
-colnames(rep_h12_h24_fishers_p)[5] <- "p_value"
-
-rep_h12_h24_fishers_Odds <- rep_h12_h24_fishers %>% 
-  dplyr::select(Odds_Ratio) %>% 
-  round(2)
-
-rep_h12_h24_fishers_pval <- rep_h12_h24_fishers_p %>% 
-  dplyr::select(p_value)
-
-rep_inner_join_clusters_h12_h24_distinct_count_Odds_pval <- inner_join_clusters_h12_h24_distinct_rep_count %>% 
-  bind_cols(rep_h12_h24_fishers_Odds, rep_h12_h24_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(rep_inner_join_clusters_h12_h24_distinct_count_Odds_pval, 'h12_h24_repressed_odds_p_val.csv')
-
-filter(rep_inner_join_clusters_h12_h24_distinct_count_Odds_pval, Odds_Ratio >= 5)
-
-rep_h12_h24_odds_heatmap1 <- rep_inner_join_clusters_h12_h24_distinct_count_Odds_pval %>%
-  mutate(time_points = "h12 to h24") %>% 
-  dplyr::select(cluster, Odds_Ratio, time_points) %>% 
-  mutate(cluster=factor(cluster),
-         time_points =factor(time_points),
-         Enrichfactor=cut(Odds_Ratio, breaks=c(-1, 1, 2.5, 5, 7.5, max(Odds_Ratio)), labels=c("0-1","1-2.5","2.5-5","5-7.5",">7.5")),
-         Enrichfactor=factor(as.character(Enrichfactor),levels=rev(levels(Enrichfactor))))
-
-rep_h12_h24_odds_heatmap2 <- rep_h12_h24_odds_heatmap1 %>% 
-  ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
-  geom_tile(colour="grey30",size=0.3, width = 2.5) +
-  guides(fill=guide_legend(title="Enrichment")) +
-  labs(x="",y="") +
-  scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
-  scale_x_discrete(expand=c(0,0)) +
-  scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c')), drop = FALSE) +
-  coord_fixed(ratio=0.75) +
-  theme_grey() +
-  theme(legend.position = "right",legend.direction = "vertical",
-        legend.title = element_text(colour = 'grey30', size = 10),
-        legend.margin = margin(grid::unit(0,"cm")),
-        legend.text = element_text(colour = 'grey30',size = 10),
-        legend.key.height = grid::unit(0.4,"cm"),
-        legend.key.width = grid::unit(0.4,"cm"),
-        axis.text.x = element_text(size = 10,colour = 'grey30',angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = element_blank(),
-        axis.ticks = element_line(size = 0.4),
-        plot.background = element_blank(),
-        panel.border = element_blank(),
-        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-        #plot.title = element_text(colour = 'grey30', size = 10, face = "bold"),
-        axis.title.x = element_blank(),
-        axis.title.y = element_blank())
-
-rep_h12_h24_odds_heatmap2
-
-ggsave(rep_h12_h24_odds_heatmap2, filename="rep_h12_h24_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
 
 # *1.9.4 activated h9 to h24----
 activated_h9_to_h24 <- bind_rows(h9_to_h15_tags_act, h12_to_h18_tags_act, h15_to_h21_tags_act, h18_to_h24_tags_act) %>%
   dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(activated_h9_to_h24, 'activated_h9_to_h24_isoforms.csv')
-
-activated_h12_to_h24 <- bind_rows(h12_to_h18_tags_act, h18_to_h24_tags_act) %>%
-  dplyr::select(Isoform) %>% 
-  distinct()
-
-write_csv(activated_h12_to_h24, 'activated_h12_to_h24_isoforms.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/activated_h9_to_h24_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 activated_h9_to_h24_AGI <- activated_h9_to_h24 %>% 
   mutate(gene_ID = substr(Isoform, start = 1, stop = 9))
 
-activated_h12_to_h24_AGI <- activated_h12_to_h24 %>% 
-  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) 
-
 # select just the AGI and reduce to distinct AGI
 
 activated_h9_to_h24_AGI_distinct <- activated_h9_to_h24_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(activated_h9_to_h24_AGI_distinct, 'activated_h9_to_h24_AGI_distinct.csv')
-
-activated_h12_to_h24_AGI_distinct <- activated_h12_to_h24_AGI %>%
-  dplyr::select(gene_ID) %>% 
-  distinct()
-
-write_csv(activated_h12_to_h24_AGI_distinct, 'activated_h12_to_h24_AGI_distinct.csv')
+  distinct() %>% 
+  write_csv('./01_tidy_data/activated_h9_to_h24_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h9_h24_distinct_act <- inner_join(TF_network_clusters, activated_h9_to_h24_AGI_distinct)
@@ -1111,9 +769,8 @@ act_h9_h24_fishers_pval <- act_h9_h24_fishers_p %>%
 
 act_inner_join_clusters_h9_h24_distinct_count_Odds_pval <- inner_join_clusters_h9_h24_distinct_act_count %>% 
   bind_cols(act_h9_h24_fishers_Odds, act_h9_h24_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(act_inner_join_clusters_h9_h24_distinct_count_Odds_pval, 'h9_h24_activated_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) %>% 
+  write_csv('./01_tidy_data/h9_h24_activated_odds_p_val.csv')
 
 act_h9_h24_odds_heatmap1 <- act_inner_join_clusters_h9_h24_distinct_count_Odds_pval %>%
   mutate(time_points = "late") %>% 
@@ -1127,7 +784,6 @@ act_h9_h24_odds_heatmap2 <- act_h9_h24_odds_heatmap1 %>%
   ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
   geom_tile(colour="grey30", size=0.3, width = 2.5) +
   guides(fill=guide_legend(title="Enrichment")) +
-  #labs(x="",y="") +
   scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
   scale_x_discrete(expand=c(0,0)) +
   scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c'))) +
@@ -1144,96 +800,10 @@ act_h9_h24_odds_heatmap2 <- act_h9_h24_odds_heatmap1 %>%
         axis.ticks = element_line(size = 0.4),
         plot.background = element_blank(),
         panel.border = element_blank(),
-        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-        #plot.title = element_text(colour = 'grey30', size = 10, face = "bold"),
         axis.title.x = element_blank(),
         axis.title.y = element_blank())
 
-act_h9_h24_odds_heatmap2
-
-#ggsave(act_h9_h24_odds_heatmap2, filename="act_h9_h24_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
-
-# act h12 to h24----
-
-# associate with a TFcluster number
-inner_join_clusters_h12_h24_distinct_act <- inner_join(TF_network_clusters, activated_h12_to_h24_AGI_distinct)
-
-inner_join_clusters_h12_h24_distinct_act_count <- inner_join_clusters_h12_h24_distinct_act %>%
-  group_by(cluster) %>%
-  count(cluster) %>%
-  ungroup() %>% 
-  mutate(percent = round((n/sum(n)*100), 1)) %>%
-  complete(.,cluster = 0:74, fill = list(n = 0, percent = 0)) %>% 
-  inner_join(., TF_network_clusters_count) 
-
-act_h12_h24_fishers_prep <- inner_join_clusters_h12_h24_distinct_act_count %>% 
-  mutate(fishers_col2 = sum(n) - n,
-         fishers_col4 = sum(cluster_number) - cluster_number) %>% 
-  dplyr::select(n, cluster_number, fishers_col2, fishers_col4) %>% 
-  dplyr::rename(fishers_col1 = n,
-                fishers_col3 = cluster_number) %>% 
-  relocate(fishers_col2, .after = fishers_col1)
-
-act_h12_h24_fishers <- act_h12_h24_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$estimate))
-
-colnames(act_h12_h24_fishers)[5] <- "Odds_Ratio"
-
-act_h12_h24_fishers_p <- act_h12_h24_fishers_prep %>% 
-  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$p.value)) 
-
-colnames(act_h12_h24_fishers_p)[5] <- "p_value"
-
-act_h12_h24_fishers_Odds <- act_h12_h24_fishers %>% 
-  dplyr::select(Odds_Ratio) %>% 
-  round(2)
-
-act_h12_h24_fishers_pval <- act_h12_h24_fishers_p %>% 
-  dplyr::select(p_value)
-
-act_inner_join_clusters_h12_h24_distinct_count_Odds_pval <- inner_join_clusters_h12_h24_distinct_act_count %>% 
-  bind_cols(act_h12_h24_fishers_Odds, act_h12_h24_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n)
-
-write_csv(act_inner_join_clusters_h12_h24_distinct_count_Odds_pval, 'h12_h24_activated_odds_p_val.csv')
-
-act_h12_h24_odds_heatmap1 <- act_inner_join_clusters_h12_h24_distinct_count_Odds_pval %>%
-  mutate(time_points = "late") %>% 
-  dplyr::select(cluster, Odds_Ratio, time_points) %>% 
-  mutate(cluster=factor(cluster),
-         time_points =factor(time_points),
-         Enrichfactor=cut(Odds_Ratio, breaks=c(-1, 1, 2.5, 5, 7.5, max(Odds_Ratio)), labels=c("0-1","1-2.5","2.5-5","5-7.5",">7.5")),
-         Enrichfactor=factor(as.character(Enrichfactor),levels=rev(levels(Enrichfactor))))
-
-act_h12_h24_odds_heatmap2 <- act_h12_h24_odds_heatmap1 %>% 
-  ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
-  geom_tile(colour="grey30", size=0.3, width = 2.5) +
-  guides(fill=guide_legend(title="Enrichment")) +
-  #labs(x="",y="") +
-  scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
-  scale_x_discrete(expand=c(0,0)) +
-  scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c')), drop = FALSE) +
-  coord_fixed(ratio=0.75) +
-  theme_grey() +
-  theme(legend.position = "right",legend.direction = "vertical",
-        legend.title = element_text(colour = 'grey30', size = 10),
-        legend.margin = margin(grid::unit(0,"cm")),
-        legend.text = element_text(colour = 'grey30',size = 10),
-        legend.key.height = grid::unit(0.4,"cm"),
-        legend.key.width = grid::unit(0.4,"cm"),
-        axis.text.x = element_text(size = 10,colour = 'grey30',angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = element_blank(),
-        axis.ticks = element_line(size = 0.4),
-        plot.background = element_blank(),
-        panel.border = element_blank(),
-        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
-        #plot.title = element_text(colour = 'grey30', size = 10, face = "bold"),
-        axis.title.x = element_blank(),
-        axis.title.y = element_blank())
-
-act_h12_h24_odds_heatmap2
-
-ggsave(act_h12_h24_odds_heatmap2, filename="act_h12_h24_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
+ggsave(act_h9_h24_odds_heatmap2, filename="./03_plots/act_h9_h24_odds_heatmap2_new_scale.png",height=9,width=3,units="in",dpi=200)
 
 # 1.10 Patchworked Odds Ratio plots----
 # TF cluster sizes plot
@@ -1252,9 +822,7 @@ TF_cluster_sizes_plot <- act_inner_join_clusters_h9_h24_distinct_count_Odds_pval
         panel.grid.major = element_blank(),
         axis.ticks.x=element_line(size=0.4),
         plot.title = element_text(colour = 'grey30', size = 10, face = "bold", hjust = 0.5)) 
-#+ggtitle('Cluster sizes')
 
-TF_cluster_sizes_plot
 
 rep_patched_tiles <- TF_cluster_sizes_plot + (rep_h0_h15_odds_heatmap2 + theme(legend.position = "none")) + rep_h9_h24_odds_heatmap2 +
   plot_layout(guides = 'auto')
@@ -1266,16 +834,7 @@ rep_patched_tiles2
 
 ggsave(rep_patched_tiles2, filename="rep_patched_tiles_alt_scale2.png", height = 9, width = 4.5, units = "in", dpi = 300)
 
-# rep patched tiles no overlap----
-
-rep_patched_tiles3 <- TF_cluster_sizes_plot + rep_h0_h12_odds_heatmap2 + theme(legend.position = "none") + rep_h12_h24_odds_heatmap2 + theme(legend.position = "none")
-
-rep_patched_tiles3
-
-ggsave(rep_patched_tiles3, filename="rep_patched_tiles_alt_scale3.png", height = 9, width = 4.5, units = "in", dpi = 300)
-
 # act patched tiles overlap----
-
 act_patched_tiles <- TF_cluster_sizes_plot + (act_h0_h15_odds_heatmap2 + theme(legend.position = "none")) + act_h9_h24_odds_heatmap2 +
   plot_layout(guides = 'auto')
 
@@ -1285,22 +844,6 @@ act_patched_tiles2 <- act_h0_h15_odds_heatmap2 + theme(legend.position = "none")
 act_patched_tiles2
 
 ggsave(act_patched_tiles2, filename="act_patched_tiles_alt_scale2.png", height = 9, width = 4.5, units = "in", dpi = 300)
-
-# act patched tiles no overlap----
-
-act_patched_tiles3 <- act_h0_h12_odds_heatmap2 + act_h12_h24_odds_heatmap2 + plot_layout(guides = "collect")
-
-act_patched_tiles3
-
-ggsave(act_patched_tiles3, filename="act_patched_tiles_alt_scale3.png", height = 9, width = 4.5, units = "in", dpi = 300)
-
-patch_plot <- TF_cluster_sizes_plot + (rep_h0_h12_odds_heatmap2 + rep_h12_h24_odds_heatmap2 + act_h0_h12_odds_heatmap2 + act_h12_h24_odds_heatmap2 + plot_layout(ncol = 4) + plot_layout(guides = "collect")) 
-
-ggsave(patch_plot2, filename="patch_plot2.png", height = 9, width = 7, units = "in", dpi = 300)
-
-patch_plot2 <- TF_cluster_sizes_plot + (rep_h0_h15_odds_heatmap2 + rep_h9_h24_odds_heatmap2 + act_h0_h15_odds_heatmap2 + act_h9_h24_odds_heatmap2 + plot_layout(ncol = 4) + plot_layout(guides = "collect"))
-
-patch_plot3
 
 # 1.11 z-score plots----
 # *1.11.1 cluster 9----
@@ -1374,76 +917,6 @@ ggsave('cluster9_h0_h15_rep_isoforms_z_scores2.png', height = 5, width = 4, unit
 
 cluster9_h0_h15_rep_isoforms_z_scores
 
-# h0_12----
-# get cluster 9 genes
-# this is just gene_IDs
-cluster9_h0_h12_rep <- inner_join_clusters_h0_h12_distinct_rep %>% 
-  filter(cluster %in% '9')
-
-# get the associated isoforms
-cluster9_genes_isoforms_rep_new <- repressed_h0_to_h12_new_AGI %>% 
-  inner_join(cluster9_h0_h12_rep, by= 'gene_ID') %>% 
-  dplyr::select(-gene_ID)
-
-write_csv(cluster9_genes_isoforms_rep_new, 'cluster9_genes_isoforms_rep_new.csv')
-
-# write the just gene_IDs to file
-write_csv(cluster9_h0_h12_rep, 'cluster9_h0_h12_rep.csv')
-
-# get gene descriptions from TAIR add to the 'genes_ID' file then read back in
-cluster9_gene_ids_rep_new <- read_csv('cluster9_h0_h12_rep_with_gene_IDs.csv')
-
-cluster9_h0_h12_rep_with_gene_IDs <- cluster9_gene_ids_rep_new %>%
-  inner_join(cluster9_h0_h12_rep, by= 'gene_ID') %>%
-  dplyr::select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
-write_csv(cluster9_h0_h12_rep_with_gene_IDs, 'cluster9_h0_h12_rep_with_gene_IDs.csv')
-
-#cluster9_h0_h12_rep_isoforms
-cluster9_h0_h12_rep_isoforms_z_scores <- cluster9_genes_isoforms_rep_new %>% 
-  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
-  dplyr::select(-(c(2,23))) %>% 
-  pivot_longer(cols= Col_T9:rve2_T18,
-               names_to='time_point',
-               values_to='TPM') %>% 
-  group_by(Isoform) %>% 
-  mutate(z_score = scale(TPM)) %>% 
-  ungroup() %>%
-  group_by(time_point) %>% 
-  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
-  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
-                          grepl('_T10', time_point) ~ 3,
-                          grepl('_T11', time_point) ~ 6,
-                          grepl('_T12', time_point) ~ 7.5,
-                          grepl('_T13', time_point) ~ 9,
-                          grepl('_T14', time_point) ~ 12,
-                          grepl('_T15', time_point) ~ 15,
-                          grepl('_T16', time_point) ~ 18,
-                          grepl('_T17', time_point) ~ 21,
-                          TRUE ~ 24),
-         genotype = case_when(grepl('Col', time_point) ~ 'Col',
-                              TRUE ~ 'rve')) %>% 
-  arrange(time) %>%
-  ggplot(aes(time, mean)) +          
-  geom_line(aes(color = genotype), size = 1.5) + 
-  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
-  scale_x_continuous(breaks = seq(0, 24, 3)) +
-  theme_light(base_family = 'Arial',
-              base_size = 14) +
-  xlab('h after cooling (day 2)') +
-  ylab('mean z-score') +
-  theme(legend.position = c(0.25, 0.75),
-        legend.background = element_rect(linewidth=0.8, linetype="solid", 
-                                         colour ="grey30"),
-        legend.title = element_blank()) +
-  ggtitle('Cluster 9', subtitle = '111 isoforms (85 gene loci)')
-
-ggsave('cluster9_h0_h12_rep_isoforms_z_scores.png', height = 4, width = 4, units = 'in')
-
-cluster9_h0_h12_rep_isoforms_z_scores
-
 # *1.11.2 cluster 20----
 
 #get cluster 20 genes
@@ -1512,75 +985,6 @@ cluster20_h0_h15_rep_isoforms_z_scores <- cluster20_genes_isoforms_rep %>%
 ggsave('cluster20_h0_h15_rep_isoforms_z_scores.png', height = 5, width = 4, units = 'in')
 
 cluster20_h0_h15_rep_isoforms_z_scores
-
-# h0_12----
-
-#get cluster 20 genes
-# this is just gene_IDs
-cluster20_h0_h12_rep <- inner_join_clusters_h0_h12_distinct_rep %>% 
-  filter(cluster %in% '20')
-
-# get associated isoforms
-cluster20_genes_isoforms_rep_new <- repressed_h0_to_h12_new_AGI %>% 
-  inner_join(cluster20_h0_h12_rep, by= 'gene_ID') %>% 
-  dplyr::select(-gene_ID)
-
-write_csv(cluster20_genes_isoforms_rep_new, 'cluster20_genes_isoforms_rep_new.csv')
-
-# write the just gene_IDs to file
-write_csv(cluster20_h0_h12_rep, 'cluster20_h0_h12_rep.csv')
-
-cluster20_gene_ids_rep_new <- read_csv('cluster20_h0_h12_rep_gene_id.csv')
-
-cluster20_h0_h12_rep_with_gene_IDs <- cluster20_gene_ids_rep_new %>%
-  inner_join(cluster20_h0_h12_rep, by= 'gene_ID') %>%
-  dplyr::select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
-write_csv(cluster20_h0_h12_rep_with_gene_IDs, 'cluster20_h0_h12_rep_with_gene_IDs.csv')
-
-cluster20_h0_h12_rep_isoforms_z_scores <- cluster20_genes_isoforms_rep_new %>% 
-  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
-  dplyr::select(-(c(2,23))) %>% 
-  pivot_longer(cols= Col_T9:rve2_T18,
-               names_to='time_point',
-               values_to='TPM') %>% 
-  group_by(Isoform) %>% 
-  mutate(z_score = scale(TPM)) %>% 
-  ungroup() %>%
-  group_by(time_point) %>% 
-  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
-  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
-                          grepl('_T10', time_point) ~ 3,
-                          grepl('_T11', time_point) ~ 6,
-                          grepl('_T12', time_point) ~ 7.5,
-                          grepl('_T13', time_point) ~ 9,
-                          grepl('_T14', time_point) ~ 12,
-                          grepl('_T15', time_point) ~ 15,
-                          grepl('_T16', time_point) ~ 18,
-                          grepl('_T17', time_point) ~ 21,
-                          TRUE ~ 24),
-         genotype = case_when(grepl('Col', time_point) ~ 'Col',
-                              TRUE ~ 'rve')) %>% 
-  arrange(time) %>%
-  ggplot(aes(time, mean)) +          
-  geom_line(aes(color = genotype), size = 1.5) + 
-  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
-  scale_x_continuous(breaks = seq(0, 24, 3)) +
-  theme_light(base_family = 'Arial',
-              base_size = 14) +
-  xlab('h after cooling (day 2)') +
-  ylab('mean z-score') +
-  theme(legend.position = c(0.25, 0.75),
-        legend.background = element_rect(linewidth=0.8, linetype="solid", 
-                                         colour ="grey30"),
-        legend.title = element_blank()) +
-  ggtitle('Cluster 20', subtitle = '56 isoforms (45 gene loci)')
-
-ggsave('cluster20_h0_h12_rep_isoforms_z_scores.png', height = 4, width = 4, units = 'in')
-
-cluster20_h0_h12_rep_isoforms_z_scores
 
 # *1.11.3 cluster 25----
 
@@ -1651,144 +1055,6 @@ ggsave('cluster25_h0_h15_rep_isoforms_z_scores.png', height = 5, width = 4, unit
 
 cluster25_h0_h15_rep_isoforms_z_scores
 
-# h0_12----
-
-#get cluster 25 genes
-# this is just gene_IDs
-cluster25_h0_h12_rep <- inner_join_clusters_h0_h12_distinct_rep %>% 
-  filter(cluster %in% '25')
-
-# get associated isoforms
-cluster25_genes_isoforms_rep_new <- repressed_h0_to_h12_new_AGI %>% 
-  inner_join(cluster25_h0_h12_rep, by= 'gene_ID') %>% 
-  dplyr::select(-gene_ID)
-
-write_csv(cluster25_genes_isoforms_rep_new, 'cluster25_genes_isoforms_rep_new.csv')
-
-# write the just gene_IDs to file
-write_csv(cluster25_h0_h12_rep, 'cluster25_h0_h12_rep.csv')
-
-cluster25_gene_ids_rep_new <- read_csv('cluster25_h0_h12_rep_gene_id.csv')
-
-cluster25_h0_h12_rep_with_gene_IDs <- cluster25_gene_ids_rep_new %>%
-  inner_join(cluster25_h0_h12_rep, by= 'gene_ID') %>%
-  dplyr::select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
-write_csv(cluster25_h0_h12_rep_with_gene_IDs, 'cluster25_h0_h12_rep_with_gene_IDs.csv')
-
-cluster25_h0_h12_rep_isoforms_z_scores <- cluster25_genes_isoforms_rep_new %>% 
-  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
-  dplyr::select(-(c(2,23))) %>% 
-  pivot_longer(cols= Col_T9:rve2_T18,
-               names_to='time_point',
-               values_to='TPM') %>% 
-  group_by(Isoform) %>% 
-  mutate(z_score = scale(TPM)) %>% 
-  ungroup() %>%
-  group_by(time_point) %>% 
-  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
-  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
-                          grepl('_T10', time_point) ~ 3,
-                          grepl('_T11', time_point) ~ 6,
-                          grepl('_T12', time_point) ~ 7.5,
-                          grepl('_T13', time_point) ~ 9,
-                          grepl('_T14', time_point) ~ 12,
-                          grepl('_T15', time_point) ~ 15,
-                          grepl('_T16', time_point) ~ 18,
-                          grepl('_T17', time_point) ~ 21,
-                          TRUE ~ 24),
-         genotype = case_when(grepl('Col', time_point) ~ 'Col',
-                              TRUE ~ 'rve')) %>% 
-  arrange(time) %>%
-  ggplot(aes(time, mean)) +          
-  geom_line(aes(color = genotype), size = 1.5) + 
-  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
-  scale_x_continuous(breaks = seq(0, 24, 3)) +
-  theme_light(base_family = 'Arial',
-              base_size = 14) +
-  xlab('h after cooling (day 2)') +
-  ylab('mean z-score') +
-  theme(legend.position = c(0.25, 0.75),
-        legend.background = element_rect(linewidth=0.8, linetype="solid", 
-                                         colour ="grey30"),
-        legend.title = element_blank()) +
-  ggtitle('Cluster 25', subtitle = '47 isoforms (32 gene loci)')
-
-ggsave('cluster25_h0_h12_rep_isoforms_z_scores.png', height = 4, width = 4, units = 'in')
-
-cluster25_h0_h12_rep_isoforms_z_scores
-
-# *1.11.4 cluster 35----
-
-# get cluster 35 genes
-# this is just gene_IDs
-cluster35_h0_h15_rep <- inner_join_clusters_h0_h15_distinct_rep %>% 
-  filter(cluster %in% '35')
-
-# get associated isoforms
-cluster35_genes_isoforms_rep <- repressed_h0_to_h15_AGI %>% 
-  inner_join(cluster35_h0_h15_rep, by= 'gene_ID') %>% 
-  dplyr::select(-gene_ID)
-
-#write_csv(cluster35_genes_isoforms_rep, 'cluster35_genes_isoforms_rep.csv')
-
-# write the just gene_IDs to file
-write_csv(cluster35_h0_h15_rep, 'cluster35_h0_h15_rep.csv')
-
-cluster35_gene_ids_rep <- read_csv('cluster35_h0_h15_rep_gene_id.csv')
-
-cluster35_h0_h15_rep_with_gene_IDs <- cluster35_gene_ids_rep %>%
-  inner_join(cluster35_h0_h15_rep, by= 'gene_ID') %>%
-  select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
-write_csv(cluster35_h0_h15_rep_with_gene_IDs, 'cluster35_h0_h15_rep_with_gene_IDs.csv')
-
-cluster35_h0_h15_rep_isoforms_z_scores <- cluster35_genes_isoforms_rep %>% 
-  inner_join(transcript_recovered_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
-  dplyr::select(-(c(2,23))) %>% 
-  pivot_longer(cols= Col_T9:rve2_T18,
-               names_to='time_point',
-               values_to='TPM') %>% 
-  group_by(Isoform) %>% 
-  mutate(z_score = scale(TPM)) %>% 
-  ungroup() %>%
-  group_by(time_point) %>% 
-  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
-  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
-                          grepl('_T10', time_point) ~ 3,
-                          grepl('_T11', time_point) ~ 6,
-                          grepl('_T12', time_point) ~ 7.5,
-                          grepl('_T13', time_point) ~ 9,
-                          grepl('_T14', time_point) ~ 12,
-                          grepl('_T15', time_point) ~ 15,
-                          grepl('_T16', time_point) ~ 18,
-                          grepl('_T17', time_point) ~ 21,
-                          TRUE ~ 24),
-         genotype = case_when(grepl('Col', time_point) ~ 'Col',
-                              TRUE ~ 'rve')) %>% 
-  arrange(time) %>%
-  ggplot(aes(time, mean)) +          
-  geom_line(aes(color = genotype), size = 1.5) + 
-  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
-  scale_x_continuous(breaks = seq(0, 24, 3)) +
-  theme_light(base_family = 'Arial',
-              base_size = 14) +
-  xlab('h after cooling (day 2)') +
-  ylab('mean z-score') +
-  theme(legend.position = c(0.25, 0.75),
-        legend.background = element_rect(linewidth=0.8, linetype="solid", 
-                                         colour ="grey30"),
-        legend.title = element_blank()) +
-  ggtitle('Cluster 35', subtitle = '22 isoforms (19 gene loci)')
-
-ggsave('cluster35_h0_h15_rep_isoforms_z_scores.png', height = 4, width = 4, units = 'in')
-
-cluster35_h0_h15_rep_isoforms_z_scores
-
 # *1.11.5 cluster 17----
 
 # get cluster 17 genes
@@ -1858,179 +1124,6 @@ ggsave('cluster17_h9_h24_act_isoforms_z_scores.png', height = 5, width = 4, unit
 
 cluster17_h9_h24_act_isoforms_z_scores
 
-# h12_24----
-
-# get cluster 17 genes
-# this is just gene_IDs
-cluster17_h12_h24_act <- inner_join_clusters_h12_h24_distinct_act %>% 
-  filter(cluster %in% '17')
-
-# get associated isoforms
-cluster17_genes_isoforms_act_new <- activated_h12_to_h24_AGI %>% 
-  inner_join(cluster17_h12_h24_act, by = 'gene_ID') %>% 
-  dplyr::select(-gene_ID)
-
-write_csv(cluster17_genes_isoforms_act_new, 'cluster17_genes_isoforms_act_new.csv')
-
-# write the just gene_IDs to file
-write_csv(cluster17_h12_h24_act, 'cluster17_h12_h24_act.csv')
-
-cluster17_gene_ids_act_new <- read_csv('cluster17_h12_h24_act_gene_id.csv')
-
-cluster17_h12_h24_act_with_gene_IDs <- cluster17_gene_ids_act_new %>%
-  inner_join(cluster17_h12_h24_act, by= 'gene_ID') %>%
-  dplyr::select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
-write_csv(cluster17_h12_h24_act_with_gene_IDs, 'cluster17_h12_h24_act_with_gene_IDs.csv')
-
-cluster17_h12_h24_act_isoforms_z_scores <- cluster17_genes_isoforms_act_new %>% 
-  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
-  dplyr::select(-(c(2,23))) %>% 
-  pivot_longer(cols= Col_T9:rve2_T18,
-               names_to='time_point',
-               values_to='TPM') %>% 
-  group_by(Isoform) %>% 
-  mutate(z_score = scale(TPM)) %>% 
-  ungroup() %>%
-  group_by(time_point) %>% 
-  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
-  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
-                          grepl('_T10', time_point) ~ 3,
-                          grepl('_T11', time_point) ~ 6,
-                          grepl('_T12', time_point) ~ 7.5,
-                          grepl('_T13', time_point) ~ 9,
-                          grepl('_T14', time_point) ~ 12,
-                          grepl('_T15', time_point) ~ 15,
-                          grepl('_T16', time_point) ~ 18,
-                          grepl('_T17', time_point) ~ 21,
-                          TRUE ~ 24),
-         genotype = case_when(grepl('Col', time_point) ~ 'Col',
-                              TRUE ~ 'rve')) %>% 
-  arrange(time) %>%
-  ggplot(aes(time, mean)) +          
-  geom_line(aes(color = genotype), size = 1.5) + 
-  scale_color_manual(values = c("grey30", "#B3E3A0"), labels=c('Col-0', 'rve2-2')) +
-  scale_x_continuous(breaks = seq(0, 24, 3)) +
-  theme_light(base_family = 'Arial',
-              base_size = 14) +
-  xlab('h after cooling (day 2)') +
-  ylab('mean z-score') +
-  theme(legend.position = c(0.25, 0.75),
-        legend.background = element_rect(linewidth=0.8, linetype="solid", 
-                                         colour ="grey30"),
-        legend.title = element_blank()) +
-  ggtitle('Cluster 17', subtitle = '45 isoforms (45 gene loci)')
-
-ggsave('cluster17_h12_h24_act_isoforms_z_scores.png', height = 4, width = 4, units = 'in')
-
-cluster17_h12_h24_act_isoforms_z_scores
-
-# *1.11.6 cluster 50----
-
-# get cluster 50 genes
-# this is just gene_IDs
-
-cluster50_h0_h15_act <- inner_join_clusters_h0_h15_distinct_act %>% 
-  filter(cluster %in% '50')
-
-# get associated isoforms
-cluster50_genes_isoforms_act <- activated_h0_to_h15_AGI %>% 
-  inner_join(cluster50_h0_h15_act, by = 'gene_ID') %>% 
-  select(-gene_ID)
-
-#write_csv(cluster50_genes_isoforms_act, 'cluster50_genes_isoforms_act.csv')
-
-# write the just gene_IDs to file
-write_csv(cluster50_h0_h15_act, 'cluster50_h0_h15_act.csv')
-
-cluster50_gene_ids_act <- read_csv('cluster50_h0_h15_act_gene_id.csv')
-
-cluster50_h0_h15_act_with_gene_IDs <- cluster50_gene_ids_act %>%
-  inner_join(cluster50_h0_h15_act, by= 'gene_ID') %>%
-  select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
-write_csv(cluster50_h0_h15_act_with_gene_IDs, 'cluster50_h0_h15_act_with_gene_IDs.csv')
-
-cluster50_h0_h15_act_isoforms_z_scores <- cluster50_genes_isoforms_act %>% 
-  inner_join(transcript_recovered_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
-  dplyr::select(-(c(2,23))) %>% 
-  pivot_longer(cols= Col_T9:rve2_T18,
-               names_to='time_point',
-               values_to='TPM') %>% 
-  group_by(Isoform) %>% 
-  mutate(z_score = scale(TPM)) %>% 
-  ungroup() %>%
-  group_by(time_point) %>% 
-  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
-  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
-                          grepl('_T10', time_point) ~ 3,
-                          grepl('_T11', time_point) ~ 6,
-                          grepl('_T12', time_point) ~ 7.5,
-                          grepl('_T13', time_point) ~ 9,
-                          grepl('_T14', time_point) ~ 12,
-                          grepl('_T15', time_point) ~ 15,
-                          grepl('_T16', time_point) ~ 18,
-                          grepl('_T17', time_point) ~ 21,
-                          TRUE ~ 24),
-         genotype = case_when(grepl('Col', time_point) ~ 'Col',
-                              TRUE ~ 'rve')) %>% 
-  arrange(time) %>%
-  ggplot(aes(time, mean)) +          
-  geom_line(aes(color = genotype), size = 1.5) + 
-  scale_color_manual(values = c("grey30", "#B3E3A0"), labels=c('Col-0', 'rve2-2')) +
-  scale_x_continuous(breaks = seq(0, 24, 3)) +
-  theme_light(base_family = 'Arial',
-              base_size = 14) +
-  xlab('h after cooling (day 2)') +
-  ylab('mean z-score') +
-  theme(legend.position = c(0.25, 0.85),
-        legend.background = element_rect(linewidth=0.8, linetype="solid", 
-                                         colour ="grey30"),
-        legend.title = element_blank()) +
-  ggtitle('Cluster 50', subtitle = '12 isoforms (10 gene loci)')
-
-ggsave('cluster50_h0_h15_act_isoforms_z_scores.png', height = 4, width = 4, units = 'in')
-
-cluster50_h0_h15_act_isoforms_z_scores
-
-# 1.12 TF network----
-
-# 7302 gene loci grouped in 75 clusters (0-74)
-TF_network_clusters <- read_csv('TF Network Cluster Nov2018 long format.csv') %>%
-  filter(!row_number() %in% 5772)
-
-# count of gene loci in each TF cluster
-TF_network_clusters_count <-  TF_network_clusters %>% 
-  group_by(cluster) %>%
-  summarise(cluster_number = n())
-
-# *1.12.1 TF network plot----
-cluster_total_bar_plot <- rep_inner_join_clusters_h0_h15_distinct_count_Odds_pval %>%
-  ggplot(aes(x = cluster, y= cluster_number)) +
-  geom_bar(stat="identity", colour = 'grey30', fill="#7fc97f") +
-  scale_x_continuous(expand=c(0, 0), breaks=c(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70)) +
-  scale_y_reverse(expand = c(0,0), breaks = c(0, 100, 200, 300, 400, 500, 600, 700)) +
-  coord_flip() +
-  theme_minimal(base_size=12) +
-  ylab('Cluster size') +
-  theme(axis.text.y=element_blank(),
-        axis.title.y = element_blank(),
-        panel.grid.minor = element_blank(), 
-        panel.grid.major = element_blank(),
-        axis.ticks.x=element_line(size=0.4))
-
-cluster_total_bar_plot
-
-ggsave(cluster_total_bar_plot,filename="cluster_total_bar_plot.png",height=9,width=3,units="in",dpi=200)
-
-ggarrange(cluster_total_bar_plot, cluster_bar_plot_h3_h15, h3_h15_odds_heatmap2, 
-          ncol = 3, nrow = 1) %>% 
-  ggexport(filename = "test1.png")
-
 # 1.13 ANOVA----
 # *1.13.1 repressed h0 to h15----
 
@@ -2045,16 +1138,12 @@ h0_h15_extract_pivot <- h0_h15_extract %>%
                names_sep = "\\.",
                values_to ='TPM')
 
-RVE7_extract_pivot <- h0_h15_extract_pivot %>% filter(Isoform %in% 'AT1G18330_P1')
-
 h0_h15_extract_pivot_ANOVAs <- h0_h15_extract_pivot %>%
   group_by(Isoform) %>%
   do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
   ungroup %>% 
   filter(term == 'genotype') %>%
   dplyr::select(c(1,6))
-
-h0_h15_extract_pivot_ANOVAs %>% filter(Isoform %in% 'AT5G17300_P1')
 
 repressed_h0_to_h15_ANOVA_prep_clusters <-repressed_h0_to_h15_AGI %>% 
   left_join(TF_network_clusters, by = 'gene_ID') %>% 
@@ -2069,12 +1158,8 @@ h0_h15_extract_pivot_ANOVAs_stats <- repressed_h0_to_h15_ANOVA_prep_clusters %>%
                             p.value <= 0.05 & p.value > 0.01 ~ '1_star',
                             TRUE ~ 'ns'))
 
-h0_h15_extract_pivot_ANOVAs_stats %>% filter(Isoform %in% 'AT1G18330_P1')
-
 h0_h15_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
   write_csv("rep_h0_h15_1_star.csv")
-
-table(h0_h15_extract_pivot_ANOVAs_stats$p_flag)
 
 h0_h15_extract_pivot_ANOVAs_stats_summary <- h0_h15_extract_pivot_ANOVAs_stats %>% 
   group_by(p_flag) %>% 
@@ -2082,55 +1167,6 @@ h0_h15_extract_pivot_ANOVAs_stats_summary <- h0_h15_extract_pivot_ANOVAs_stats %
   mutate(freq = round(total / sum(total) *100, 1)) %>% 
   arrange(desc(freq))
 
-# rep h0 to h12----
-
-h0_h12_extract <- transcript_RNAseq %>% 
-  filter(Isoform %in% repressed_h0_to_h12_new_AGI$Isoform)
-
-h0_h12_extract_pivot <- h0_h12_extract %>%
-  dplyr::select(Isoform, Col.T9.rep1:Col.T14.rep1, Col.T9.rep2:Col.T14.rep2, Col.T9.rep3:Col.T14.rep3,
-                Rve2.T9.rep1:Rve2.T14.rep1, Rve2.T9.rep2:Rve2.T14.rep2, Rve2.T9.rep3:Rve2.T14.rep3) %>% 
-  pivot_longer(cols = c(Col.T9.rep1:Rve2.T14.rep3),
-               names_to = c('genotype', 'time_point', 'rep'),
-               names_sep = "\\.",
-               values_to ='TPM')
-
-#RVE7_extract_pivot <- h0_h12_extract_pivot %>% filter(Isoform %in% 'AT1G18330_P1')
-
-h0_h12_extract_pivot_ANOVAs <- h0_h12_extract_pivot %>%
-  group_by(Isoform) %>%
-  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
-  ungroup %>% 
-  filter(term == 'genotype') %>%
-  dplyr::select(c(1,6))
-
-h0_h12_extract_pivot_ANOVAs %>% filter(Isoform %in% 'AT5G17300_P1')
-
-repressed_h0_to_h12_ANOVA_prep_clusters <-repressed_h0_to_h12_new_AGI %>% 
-  left_join(TF_network_clusters, by = 'gene_ID') %>% 
-  mutate_all(as.character) %>% 
-  mutate(cluster = replace_na(cluster, 'nd'))
-
-h0_h12_extract_pivot_ANOVAs_stats <- repressed_h0_to_h12_ANOVA_prep_clusters %>% 
-  left_join(h0_h12_extract_pivot_ANOVAs, by = 'Isoform') %>% 
-  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
-                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
-                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
-                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
-                            TRUE ~ 'ns'))
-
-h0_h12_extract_pivot_ANOVAs_stats %>% filter(Isoform %in% 'AT1G18330_P1')
-
-h0_h12_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("rep_h0_h12_1_star.csv")
-
-#table(h0_h12_extract_pivot_ANOVAs_stats$p_flag)
-
-h0_h12_extract_pivot_ANOVAs_stats_summary <- h0_h12_extract_pivot_ANOVAs_stats %>% 
-  group_by(p_flag) %>% 
-  summarise(total = n()) %>% 
-  mutate(freq = round(total / sum(total) *100, 1)) %>% 
-  arrange(desc(freq))
 
 # *1.13.2 repressed h9 to h24----
 h9_h24_extract <- transcript_RNAseq %>% 
@@ -2168,48 +1204,6 @@ h9_h24_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>%
   write_csv("rep_h9_h24_1_star.csv")
 
 h9_h24_extract_pivot_ANOVAs_stats_summary <- h9_h24_extract_pivot_ANOVAs_stats %>% 
-  group_by(p_flag) %>% 
-  summarise(total = n()) %>% 
-  mutate(freq = round(total / sum(total) *100, 1)) %>% 
-  arrange(desc(freq))
-
-# rep h12 to h24----
-
-h12_h24_extract <- transcript_RNAseq %>% 
-  filter(Isoform %in% repressed_h12_to_h24_AGI$Isoform)
-
-h12_h24_extract_pivot <- h12_h24_extract %>%
-  dplyr::select(Isoform, Col.T14.rep1:Col.T18.rep1, Col.T14.rep2:Col.T18.rep2, Col.T14.rep3:Col.T18.rep3,
-                Rve2.T14.rep1:Rve2.T18.rep1, Rve2.T14.rep2:Rve2.T18.rep2, Rve2.T14.rep3:Rve2.T18.rep3) %>% 
-  pivot_longer(cols = c(Col.T14.rep1:Rve2.T18.rep3),
-               names_to = c('genotype', 'time_point', 'rep'),
-               names_sep = "\\.",
-               values_to ='TPM')
-
-h12_h24_extract_pivot_ANOVAs <- h12_h24_extract_pivot %>%
-  group_by(Isoform) %>%
-  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
-  ungroup %>% 
-  filter(term == 'genotype') %>%
-  dplyr::select(c(1,6))
-
-repressed_h12_to_h24_ANOVA_prep_clusters <-repressed_h12_to_h24_AGI %>% 
-  left_join(TF_network_clusters, by = 'gene_ID') %>% 
-  mutate_all(as.character) %>% 
-  mutate(cluster = replace_na(cluster, 'nd'))
-
-h12_h24_extract_pivot_ANOVAs_stats <- repressed_h12_to_h24_ANOVA_prep_clusters %>% 
-  left_join(h12_h24_extract_pivot_ANOVAs, by = 'Isoform') %>% 
-  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
-                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
-                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
-                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
-                            TRUE ~ 'ns')) 
-
-h12_h24_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("rep_h12_h24_1_star.csv")
-
-h12_h24_extract_pivot_ANOVAs_stats_summary <- h12_h24_extract_pivot_ANOVAs_stats %>% 
   group_by(p_flag) %>% 
   summarise(total = n()) %>% 
   mutate(freq = round(total / sum(total) *100, 1)) %>% 
@@ -2257,48 +1251,6 @@ h0_h15_extract_act_pivot_ANOVAs_stats_summary <- h0_h15_extract_act_pivot_ANOVAs
   mutate(freq = round(total / sum(total) *100, 1)) %>% 
   arrange(desc(freq))
 
-# act h0 to h12----
-
-h0_h12_extract_act <- transcript_RNAseq %>% 
-  filter(Isoform %in% activated_h0_to_h12_AGI$Isoform)
-
-h0_h12_extract_act_pivot <- h0_h12_extract_act %>%
-  dplyr::select(Isoform, Col.T9.rep1:Col.T14.rep1, Col.T9.rep2:Col.T14.rep2, Col.T9.rep3:Col.T14.rep3,
-                Rve2.T9.rep1:Rve2.T14.rep1, Rve2.T9.rep2:Rve2.T14.rep2, Rve2.T9.rep3:Rve2.T14.rep3) %>% 
-  pivot_longer(cols = c(Col.T9.rep1:Rve2.T14.rep3),
-               names_to = c('genotype', 'time_point', 'rep'),
-               names_sep = "\\.",
-               values_to ='TPM')
-
-h0_h12_extract_act_pivot_ANOVAs <- h0_h12_extract_act_pivot %>%
-  group_by(Isoform) %>%
-  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
-  ungroup %>% 
-  filter(term == 'genotype') %>%
-  dplyr::select(c(1,6))
-
-activated_h0_to_h12_ANOVA_prep_clusters <-activated_h0_to_h12_AGI %>% 
-  left_join(TF_network_clusters, by = 'gene_ID') %>% 
-  mutate_all(as.character) %>% 
-  mutate(cluster = replace_na(cluster, 'nd'))
-
-h0_h12_extract_act_pivot_ANOVAs_stats <- activated_h0_to_h12_ANOVA_prep_clusters %>% 
-  left_join(h0_h12_extract_act_pivot_ANOVAs, by = 'Isoform') %>% 
-  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
-                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
-                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
-                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
-                            TRUE ~ 'ns'))
-
-h0_h12_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("act_h0_h12_1_star.csv")
-
-h0_h12_extract_act_pivot_ANOVAs_stats_summary <- h0_h12_extract_act_pivot_ANOVAs_stats %>% 
-  group_by(p_flag) %>% 
-  summarise(total = n()) %>% 
-  mutate(freq = round(total / sum(total) *100, 1)) %>% 
-  arrange(desc(freq))
-
 # *1.13.4 activated h9 to h24----
 
 h9_h24_extract_act <- transcript_RNAseq %>% 
@@ -2341,48 +1293,6 @@ h9_h24_extract_act_pivot_ANOVAs_stats_summary <- h9_h24_extract_act_pivot_ANOVAs
   mutate(freq = round(total / sum(total) *100, 1)) %>% 
   arrange(desc(freq))
 
-# act h12 to h24----
-
-h12_h24_extract_act <- transcript_RNAseq %>% 
-  filter(Isoform %in% activated_h12_to_h24_AGI$Isoform)
-
-h12_h24_extract_act_pivot <- h12_h24_extract_act %>%
-  dplyr::select(Isoform, Col.T14.rep1:Col.T18.rep1, Col.T14.rep2:Col.T18.rep2, Col.T14.rep3:Col.T18.rep3,
-                Rve2.T14.rep1:Rve2.T18.rep1, Rve2.T14.rep2:Rve2.T18.rep2, Rve2.T14.rep3:Rve2.T18.rep3) %>% 
-  pivot_longer(cols = c(Col.T14.rep1:Rve2.T18.rep3),
-               names_to = c('genotype', 'time_point', 'rep'),
-               names_sep = "\\.",
-               values_to ='TPM')
-
-h12_h24_extract_act_pivot_ANOVAs <- h12_h24_extract_act_pivot %>%
-  group_by(Isoform) %>%
-  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
-  ungroup %>% 
-  filter(term == 'genotype') %>%
-  dplyr::select(c(1,6))
-
-activated_h12_to_h24_ANOVA_prep_clusters <-activated_h12_to_h24_AGI %>% 
-  left_join(TF_network_clusters, by = 'gene_ID') %>% 
-  mutate_all(as.character) %>% 
-  mutate(cluster = replace_na(cluster, 'nd'))
-
-h12_h24_extract_act_pivot_ANOVAs_stats <- activated_h12_to_h24_ANOVA_prep_clusters %>% 
-  left_join(h12_h24_extract_act_pivot_ANOVAs, by = 'Isoform') %>% 
-  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
-                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
-                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
-                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
-                            TRUE ~ 'ns'))
-
-h12_h24_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("act_h12_h24_1_star.csv")
-
-h12_h24_extract_act_pivot_ANOVAs_stats_summary <- h12_h24_extract_act_pivot_ANOVAs_stats %>% 
-  group_by(p_flag) %>% 
-  summarise(total = n()) %>% 
-  mutate(freq = round(total / sum(total) *100, 1)) %>% 
-  arrange(desc(freq))
-
 # 1.14 ANOVA enrichment----
 # final plot made in GraphPad Prism
 
@@ -2399,20 +1309,6 @@ h0_h15_extract_pivot_ANOVAs_stats_no_ns<-h0_h15_extract_pivot_ANOVAs_stats_no_ns
   complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
   write_csv("rep_h0_15_ANOVA_by_R.csv")
 
-# rep h0 to h12----
-
-h0_h12_extract_pivot_ANOVAs_stats_no_ns <- h0_h12_extract_pivot_ANOVAs_stats %>% 
-  filter(!p_flag == 'ns') %>% 
-  group_by(cluster) %>% 
-  summarise(total = n()) 
-
-h0_h12_extract_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h0_h12_extract_pivot_ANOVAs_stats_no_ns$cluster))
-
-h0_h12_extract_pivot_ANOVAs_stats_no_ns<-h0_h12_extract_pivot_ANOVAs_stats_no_ns %>% 
-  dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("rep_h0_12_ANOVA_by_R.csv")
-
 # *1.14.2 h9 to h24 repressed
 h9_h24_extract_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_pivot_ANOVAs_stats %>% 
   filter(!p_flag == 'ns') %>% 
@@ -2425,20 +1321,6 @@ h9_h24_extract_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_pivot_ANOVAs_stats_no_
   dplyr::arrange(cluster) %>% 
   complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
   write_csv("rep_h9_24_ANOVA_by_R.csv")
-
-# rep h12 to h24----
-
-h12_h24_extract_pivot_ANOVAs_stats_no_ns <- h12_h24_extract_pivot_ANOVAs_stats %>% 
-  filter(!p_flag == 'ns') %>% 
-  group_by(cluster) %>% 
-  summarise(total = n()) 
-
-h12_h24_extract_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h12_h24_extract_pivot_ANOVAs_stats_no_ns$cluster))
-
-h12_h24_extract_pivot_ANOVAs_stats_no_ns <- h12_h24_extract_pivot_ANOVAs_stats_no_ns %>% 
-  dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("rep_h12_24_ANOVA_by_R.csv")
 
 # *1.14.3 h0 to h15 activated
 h0_h15_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_act_pivot_ANOVAs_stats %>% 
@@ -2453,20 +1335,6 @@ h0_h15_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_act_pivot_ANOVAs_s
   complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
   write_csv("act_h0_15_ANOVA_by_R.csv")
 
-# act h0 to h12----
-
-h0_h12_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h12_extract_act_pivot_ANOVAs_stats %>% 
-  filter(!p_flag == 'ns') %>% 
-  group_by(cluster) %>% 
-  summarise(total = n()) 
-
-h0_h12_extract_act_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h0_h12_extract_act_pivot_ANOVAs_stats_no_ns$cluster))
-
-h0_h12_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h12_extract_act_pivot_ANOVAs_stats_no_ns %>% 
-  dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("act_h0_12_ANOVA_by_R.csv")
-
 # *1.14.4 h9 to h24 activated
 h9_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_act_pivot_ANOVAs_stats %>% 
   filter(!p_flag == 'ns') %>% 
@@ -2479,20 +1347,6 @@ h9_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_act_pivot_ANOVAs_s
   dplyr::arrange(cluster) %>% 
   complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
   write_csv("act_h9_24_ANOVA_by_R.csv")
-
-# act h12 to h24----
-
-h12_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h12_h24_extract_act_pivot_ANOVAs_stats %>% 
-  filter(!p_flag == 'ns') %>% 
-  group_by(cluster) %>% 
-  summarise(total = n()) 
-
-h12_h24_extract_act_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h12_h24_extract_act_pivot_ANOVAs_stats_no_ns$cluster))
-
-h12_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h12_h24_extract_act_pivot_ANOVAs_stats_no_ns %>% 
-  dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("act_h12_24_ANOVA_by_R.csv")
 
 # 1.15 UpSetR overlap plot----
 
@@ -2532,44 +1386,6 @@ UpSet
 
 dev.off()
 
-# 12 h no overlap----
-
-h0_h12_extract_pivot_ANOVAs_filter_out_ns <- h0_h12_extract_pivot_ANOVAs %>% 
-  filter(! p.value > 0.05)
-
-h12_h24_extract_pivot_ANOVAs_filter_out_ns <- h12_h24_extract_pivot_ANOVAs %>% 
-  filter(! p.value > 0.05)
-
-h0_h12_extract_act_pivot_ANOVAs_filter_out_ns <- h0_h12_extract_act_pivot_ANOVAs %>% 
-  filter(! p.value > 0.05)
-
-h12_h24_extract_act_pivot_ANOVAs_filter_out_ns <- h12_h24_extract_act_pivot_ANOVAs %>% 
-  filter(! p.value > 0.05)
-
-# filter out CCX2 and LBD11 from the h0_h15_extract_pivot_ANOVAs_filter_out_ns dataset due to tp 7.5 issue
-# h0_h15_extract_pivot_ANOVAs_filter_out_ns <- h0_h15_extract_pivot_ANOVAs_filter_out_ns %>% 
-#   filter(! Isoform == 'AT5G17850_P1' & ! Isoform == 'AT2G28500_P1')
-
-myGeneSets_new <- list('repressed h0-12' = h0_h12_extract_pivot_ANOVAs_filter_out_ns$Isoform,
-                       'repressed h12-24' = h12_h24_extract_pivot_ANOVAs_filter_out_ns$Isoform,
-                       'activated h0-12' = h0_h12_extract_act_pivot_ANOVAs_filter_out_ns$Isoform,
-                       'activated h12-24' = h12_h24_extract_act_pivot_ANOVAs_filter_out_ns$Isoform
-)
-
-#h0_h12_extract_pivot_ANOVAs_filter_out_ns %>% filter(Isoform %in% 'AT5G17850_P1')
-
-# fromList: a function to convert a list of named vectors to a data frame compatible with UpSetR
-sets_new <- fromList(myGeneSets_new)
-
-UpSet_new <-upset(sets_new, nsets=4, keep.order = T, sets = c("repressed h0-12", "repressed h12-24",
-                                                              "activated h0-12", "activated h12-24"),
-                  sets.bar.color= c('#D53E4F', '#D53E4F', '#4DAF4A', '#4DAF4A'), matrix.color= 'grey30', point.size = 2.5, sets.x.label = "Consistent DE groups", mainbar.y.label = "Sizes of intersections")
-UpSet_new
-png("Upset_repressed_and_activated_new.png", width = 4, height = 3, units = 'in', res = 300)
-UpSet_new
-
-dev.off()
-
 # 1.16 Non-redundant isoform lists----
 # *1.16.1 repressed----
 repressed_distinct <- bind_rows(h0_h15_extract_pivot_ANOVAs_filter_out_ns,
@@ -2585,37 +1401,6 @@ repressed_distinct_AGI <- repressed_distinct %>%
   distinct(gene_ID) %>% 
   write_csv("repressed_distinct_AGI.csv")
 
-Allan_list_AGI <- Allan_list_AGI %>% 
-  rename('AGI' = 'gene_ID')
-
-Allan_list_AGI_new <- Allan_list_AGI_new %>% 
-  rename('AGI' = 'gene_ID')
-
-overlap_isform_old <- anti_join(Allan_list_AGI_new, repressed_distinct_AGI, by = 'gene_ID')
-
-# 12 h no overlap----
-
-repressed_distinct_new <- bind_rows(h0_h12_extract_pivot_ANOVAs_filter_out_ns,
-                                    h12_h24_extract_pivot_ANOVAs_filter_out_ns) %>% 
-  distinct(Isoform) %>%
-  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) %>% 
-  left_join(., TF_network_clusters) %>%
-  mutate_all(as.character) %>%
-  mutate(cluster = replace_na(cluster, 'nd')) %>% 
-  write_csv("repressed_distinct_new.csv")
-
-repressed_distinct_AGI_new <- repressed_distinct_new %>% 
-  distinct(gene_ID) %>% 
-  write_csv("repressed_distinct_AGI_new.csv")
-
-Allan_list_AGI <- Allan_list_AGI %>% 
-  rename('AGI' = 'gene_ID')
-
-Allan_list_AGI_new <- Allan_list_AGI_new %>% 
-  rename('AGI' = 'gene_ID')
-
-overlap_isform_old <- anti_join(Allan_list_AGI_new, repressed_distinct_AGI_new, by = 'gene_ID')
-
 # *1.16.2 activated----
 activated_distinct <- bind_rows(h0_h15_extract_act_pivot_ANOVAs_filter_out_ns,
                                 h9_h24_extract_act_pivot_ANOVAs_filter_out_ns) %>% 
@@ -2629,21 +1414,6 @@ activated_distinct <- bind_rows(h0_h15_extract_act_pivot_ANOVAs_filter_out_ns,
 activated_distinct_AGI <- activated_distinct %>% 
   distinct(gene_ID) %>% 
   write_csv("activated_distinct_AGI.csv")
-
-# 12 h no overlap----
-
-activated_distinct_new <- bind_rows(h0_h12_extract_act_pivot_ANOVAs_filter_out_ns,
-                                    h12_h24_extract_act_pivot_ANOVAs_filter_out_ns) %>% 
-  distinct(Isoform) %>%
-  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) %>% 
-  left_join(., TF_network_clusters) %>%
-  mutate_all(as.character) %>%
-  mutate(cluster = replace_na(cluster, 'nd')) %>% 
-  write_csv("activated_distinct_new.csv")
-
-activated_distinct_AGI_new <- activated_distinct_new %>% 
-  distinct(gene_ID) %>% 
-  write_csv("activated_distinct_AGI_new.csv")
 
 # 1.17 GO enrich plots----
 At_genes_all<-read.csv('Gene TPM.csv')
@@ -2667,25 +1437,6 @@ dp_repressed <- dotplot(GO_analysis, showCategory=10, font.size=12, label_format
 dp_repressed <-  dp_repressed + ggtitle("Repressed DE group")
 ggsave('dp_repressed_GO.png', dp_repressed, height=3,width=9.5,units="in",dpi=200)
 
-# 12 h no overlap----
-
-GO_analysis_rep_new <- enrichGO(gene = repressed_distinct_AGI_new$gene_ID,
-                                universe = all_genes,
-                                OrgDb = org.At.tair.db,
-                                keyType = "TAIR",
-                                ont = "BP",
-                                pAdjustMethod = "BH",
-                                pvalueCutoff = 0.05,
-                                qvalueCutoff = 0.10,
-                                readable = TRUE,
-                                pool = TRUE)
-
-dotplot(GO_analysis_rep_new, showCategory=10, font.size=12, label_format = 55)
-dp_repressed_new <- dotplot(GO_analysis_rep_new, showCategory=10, font.size=12, label_format = 55)
-
-dp_repressed_new <-  dp_repressed_new + ggtitle("Repressed DE group")
-ggsave('dp_repressed_GO_new.png', dp_repressed_new, height=3,width=9.5,units="in",dpi=200)
-
 # *1.17.2 GO activated----
 GO_analysis_act <- enrichGO(gene = activated_distinct_AGI$gene_ID,
                             universe = all_genes,
@@ -2703,26 +1454,6 @@ dp_activated <- dotplot(GO_analysis_act, showCategory=10, font.size=12, label_fo
 
 dp_activated <-  dp_activated + ggtitle("Activated DE group")
 ggsave('dp_activated_GO.png', dp_activated, height=3,width=9.5,units="in",dpi=200)
-
-# 12 h no overlap----
-
-GO_analysis_act_new <- enrichGO(gene = activated_distinct_AGI_new$gene_ID,
-                                universe = all_genes,
-                                OrgDb = org.At.tair.db,
-                                keyType = "TAIR",
-                                ont = "BP",
-                                pAdjustMethod = "BH",
-                                pvalueCutoff = 0.05,
-                                qvalueCutoff = 0.10,
-                                readable = TRUE,
-                                pool = TRUE)
-
-dotplot(GO_analysis_act_new, showCategory=10, font.size=12, label_format = 55)
-dp_activated_new <- dotplot(GO_analysis_act_new, showCategory=10, font.size=12, label_format = 55)
-
-dp_activated_new <-  dp_activated_new + ggtitle("Activated DE group")
-ggsave('dp_activated_GO_new.png', dp_activated, height=3,width=9.5,units="in",dpi=200)
-
 
 
 GO_rep_act <- dp_repressed / dp_activated 
@@ -2929,8 +1660,6 @@ cluster9_repressed_with_gene_IDs <- cluster9_gene_ids_repressed %>%
   inner_join(cluster9_repressed, by= 'gene_ID') %>%
   dplyr::select(-c(2, 4, 7))
 
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
 write_csv(cluster9_repressed_with_gene_IDs, 'cluster9_repressed_with_gene_IDs.csv')
 
 #cluster9_repressed_isoforms
@@ -2976,7 +1705,6 @@ ggsave('cluster9_repressed_isoforms_z_scores.png', height = 5, width = 4, units 
 
 cluster9_repressed_isoforms_z_scores
 
-
 # *1.19.2 cluster 20----
 
 # get cluster 20 genes
@@ -3003,8 +1731,6 @@ cluster20_gene_ids_repressed <- read_csv('cluster20_repressed_with_gene_IDs.csv'
 cluster20_repressed_with_gene_IDs <- cluster20_gene_ids_repressed %>%
   inner_join(cluster20_repressed, by= 'gene_ID') %>%
   dplyr::select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
 
 write_csv(cluster20_repressed_with_gene_IDs, 'cluster20_repressed_with_gene_IDs.csv')
 
@@ -3077,8 +1803,6 @@ cluster25_repressed_with_gene_IDs <- cluster25_gene_ids_repressed %>%
   inner_join(cluster25_repressed, by= 'gene_ID') %>%
   dplyr::select(-c(2, 4, 7))
 
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
-
 write_csv(cluster25_repressed_with_gene_IDs, 'cluster25_repressed_with_gene_IDs.csv')
 
 #cluster25_repressed_isoforms
@@ -3149,8 +1873,6 @@ cluster17_gene_ids_activated <- read_csv('cluster17_activated_with_gene_IDs.csv'
 cluster17_activated_with_gene_IDs <- cluster17_gene_ids_activated %>%
   inner_join(cluster17_activated, by= 'gene_ID') %>%
   dplyr::select(-c(2, 4, 7))
-
-#colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
 
 write_csv(cluster17_activated_with_gene_IDs, 'cluster17_activated_with_gene_IDs.csv')
 
