@@ -20,6 +20,8 @@ library(ggplot2)
 library(GOplot)
 library(org.At.tair.db)
 library(glue)
+library(broom)
+library(car)
 
 # 1. RNAseq dataset----
 # Temperature & time series RNA-seq experiment
@@ -205,44 +207,44 @@ get_consistent_windows <- function(df, filter_col, new_col_str1, new_col_str2, n
 consistent_h0_to_h6_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h0_to_h6, 
                                                          h0_rank, h3_rank, h6_rank,
                                                          h0_repressed, h3_repressed, h6_repressed,
-                                                         mean_rank_h0_to_h6) %>% 
-  write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_rep.csv')
+                                                         mean_rank_h0_to_h6) 
+#%>% write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_rep.csv')
 
 consistent_h3_to_h9_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h3_to_h9, 
                                                          h3_rank, h6_rank, h9_rank,
                                                          h3_repressed, h6_repressed, h9_repressed,
-                                                         mean_rank_h3_to_h9) %>% 
-  write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_rep.csv')
+                                                         mean_rank_h3_to_h9) 
+#%>% write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_rep.csv')
 
 consistent_h6_to_h12_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h6_to_h12, 
                                                           h6_rank, h9_rank, h12_rank,
                                                           h6_repressed, h9_repressed, h12_repressed,
-                                                          mean_rank_h6_to_h12) %>% 
-  write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_rep.csv')
+                                                          mean_rank_h6_to_h12) 
+#%>% write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_rep.csv')
 
 consistent_h9_to_h15_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h9_to_h15, 
                                                           h9_rank, h12_rank, h15_rank,
                                                           h9_repressed, h12_repressed, h15_repressed,
-                                                          mean_rank_h9_to_h15) %>% 
-  write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_rep.csv')
+                                                          mean_rank_h9_to_h15) 
+#%>% write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_rep.csv')
 
 consistent_h12_to_h18_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h12_to_h18, 
                                                            h12_rank, h15_rank, h18_rank,
                                                            h12_repressed, h15_repressed, h18_repressed,
-                                                           mean_rank_h12_to_h18) %>% 
-  write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_rep.csv')
+                                                           mean_rank_h12_to_h18) 
+#%>% write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_rep.csv')
 
 consistent_h15_to_h21_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h15_to_h21, 
                                                            h15_rank, h18_rank, h21_rank,
                                                            h15_repressed, h18_repressed, h21_repressed,
-                                                           mean_rank_h15_to_h21) %>% 
-  write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_rep.csv')
+                                                           mean_rank_h15_to_h21) 
+#%>% write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_rep.csv')
 
 consistent_h18_to_h24_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h18_to_h24, 
                                                            h18_rank, h21_rank, h24_rank,
                                                            h18_repressed, h21_repressed, h24_repressed,
-                                                           mean_rank_h18_to_h24) %>% 
-  write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_rep.csv')
+                                                           mean_rank_h18_to_h24) 
+#%>% write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_rep.csv')
 
 
 # *1.4.2 consistent activated ranked----
@@ -250,44 +252,44 @@ consistent_h18_to_h24_ranked_rep <- get_consistent_windows(repressed_simple_flag
 consistent_h0_to_h6_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h0_to_h6, 
                                                          h0_rank, h3_rank, h6_rank,
                                                          h0_activated, h3_activated, h6_activated,
-                                                         mean_rank_h0_to_h6) %>% 
-  write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_act.csv')
+                                                         mean_rank_h0_to_h6) 
+#%>% write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_act.csv')
 
 consistent_h3_to_h9_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h3_to_h9, 
                                                          h3_rank, h6_rank, h9_rank,
                                                          h3_activated, h6_activated, h9_activated,
-                                                         mean_rank_h3_to_h9) %>% 
-  write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_act.csv')
+                                                         mean_rank_h3_to_h9) 
+#%>% write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_act.csv')
 
 consistent_h6_to_h12_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h6_to_h12, 
                                                           h6_rank, h9_rank, h12_rank,
                                                           h6_activated, h9_activated, h12_activated,
-                                                          mean_rank_h6_to_h12) %>% 
-  write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_act.csv')
+                                                          mean_rank_h6_to_h12) 
+#%>% write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_act.csv')
 
 consistent_h9_to_h15_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h9_to_h15, 
                                                           h9_rank, h12_rank, h15_rank,
                                                           h9_activated, h12_activated, h15_activated,
-                                                          mean_rank_h9_to_h15) %>% 
-  write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_act.csv')
+                                                          mean_rank_h9_to_h15) 
+#%>% write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_act.csv')
 
 consistent_h12_to_h18_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h12_to_h18, 
                                                            h12_rank, h15_rank, h18_rank,
                                                            h12_activated, h15_activated, h18_activated,
-                                                           mean_rank_h12_to_h18) %>% 
-  write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_act.csv')
+                                                           mean_rank_h12_to_h18) 
+#%>% write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_act.csv')
 
 consistent_h15_to_h21_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h15_to_h21, 
                                                            h15_rank, h18_rank, h21_rank,
                                                            h15_activated, h18_activated, h21_activated,
-                                                           mean_rank_h15_to_h21) %>% 
-  write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_act.csv')
+                                                           mean_rank_h15_to_h21) 
+#%>% write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_act.csv')
 
 consistent_h18_to_h24_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h18_to_h24, 
                                                            h18_rank, h21_rank, h24_rank,
                                                            h18_activated, h21_activated, h24_activated,
-                                                           mean_rank_h18_to_h24) %>% 
-  write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_act.csv')
+                                                           mean_rank_h18_to_h24) 
+#%>% write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_act.csv')
 
 
 # *1.5 split the isoform tag----
@@ -444,8 +446,8 @@ TF_network_clusters_count <-  TF_network_clusters %>%
 # combine consistent groups
 repressed_h0_to_h15 <- bind_rows(h0_to_h6_tags_rep, h3_to_h9_tags_rep, h6_to_h12_tags_rep, h9_to_h15_tags_rep) %>%
   dplyr::select(Isoform) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/repressed_h0_to_h15_isoforms.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h0_to_h15_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 
@@ -456,8 +458,8 @@ repressed_h0_to_h15_AGI <- repressed_h0_to_h15 %>%
 
 repressed_h0_to_h15_AGI_distinct <- repressed_h0_to_h15_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/repressed_h0_to_h15_AGI_distinct.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h0_to_h15_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h0_h15_distinct_rep <- inner_join(TF_network_clusters, repressed_h0_to_h15_AGI_distinct)
@@ -497,8 +499,8 @@ rep_h0_h15_fishers_pval <- rep_h0_h15_fishers_p %>%
 
 rep_inner_join_clusters_h0_h15_distinct_count_Odds_pval <- inner_join_clusters_h0_h15_distinct_rep_count %>% 
   bind_cols(rep_h0_h15_fishers_Odds, rep_h0_h15_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n) %>% 
-  write_csv('./01_tidy_data/h0_h15_repressed_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) 
+#%>% write_csv('./01_tidy_data/h0_h15_repressed_odds_p_val.csv')
 
 rep_h0_h15_odds_heatmap1 <- rep_inner_join_clusters_h0_h15_distinct_count_Odds_pval %>%
   mutate(time_points = "early") %>% 
@@ -538,8 +540,8 @@ ggsave(rep_h0_h15_odds_heatmap2, filename="./03_plots/rep_h0_h15_odds_heatmap2.p
 
 activated_h0_to_h15 <- bind_rows(h0_to_h6_tags_act, h3_to_h9_tags_act, h6_to_h12_tags_act, h9_to_h15_tags_act) %>%
   dplyr::select(Isoform) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/activated_h0_to_h15_isoforms.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h0_to_h15_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 activated_h0_to_h15_AGI <- activated_h0_to_h15 %>% 
@@ -549,8 +551,8 @@ activated_h0_to_h15_AGI <- activated_h0_to_h15 %>%
 
 activated_h0_to_h15_AGI_distinct <- activated_h0_to_h15_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/activated_h0_to_h15_AGI_distinct.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h0_to_h15_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h0_h15_distinct_act <- inner_join(TF_network_clusters, activated_h0_to_h15_AGI_distinct)
@@ -590,8 +592,8 @@ act_h0_h15_fishers_pval <- act_h0_h15_fishers_p %>%
 
 act_inner_join_clusters_h0_h15_distinct_count_Odds_pval <- inner_join_clusters_h0_h15_distinct_act_count %>% 
   bind_cols(act_h0_h15_fishers_Odds, act_h0_h15_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n) %>% 
-  write_csv('./01_tidy_data/h0_h15_activated_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) 
+#%>% write_csv('./01_tidy_data/h0_h15_activated_odds_p_val.csv')
 
 act_h0_h15_odds_heatmap1 <- act_inner_join_clusters_h0_h15_distinct_count_Odds_pval %>%
   mutate(time_points = "early") %>% 
@@ -624,8 +626,8 @@ ggsave(act_h0_h15_odds_heatmap2, filename="./03_plots/act_h0_h15_odds_heatmap2_n
 # *1.9.3 repressed h9 to h24----
 repressed_h9_to_h24 <- bind_rows(h9_to_h15_tags_rep, h12_to_h18_tags_rep, h15_to_h21_tags_rep, h18_to_h24_tags_rep) %>%
   dplyr::select(Isoform) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/repressed_h9_to_h24_isoforms.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h9_to_h24_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 repressed_h9_to_h24_AGI <- repressed_h9_to_h24 %>% 
@@ -635,8 +637,8 @@ repressed_h9_to_h24_AGI <- repressed_h9_to_h24 %>%
 
 repressed_h9_to_h24_AGI_distinct <- repressed_h9_to_h24_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/repressed_h9_to_h24_AGI_distinct.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h9_to_h24_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h9_h24_distinct_rep <- inner_join(TF_network_clusters, repressed_h9_to_h24_AGI_distinct)
@@ -676,8 +678,8 @@ rep_h9_h24_fishers_pval <- rep_h9_h24_fishers_p %>%
 
 rep_inner_join_clusters_h9_h24_distinct_count_Odds_pval <- inner_join_clusters_h9_h24_distinct_rep_count %>% 
   bind_cols(rep_h9_h24_fishers_Odds, rep_h9_h24_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n) %>% 
-  write_csv('./01_tidy_data/h9_h24_repressed_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) 
+#%>% write_csv('./01_tidy_data/h9_h24_repressed_odds_p_val.csv')
 
 rep_h9_h24_odds_heatmap1 <- rep_inner_join_clusters_h9_h24_distinct_count_Odds_pval %>%
   mutate(time_points = "late") %>% 
@@ -717,8 +719,8 @@ ggsave(rep_h9_h24_odds_heatmap2, filename="./03_plots/rep_h9_h24_odds_heatmap2_n
 # *1.9.4 activated h9 to h24----
 activated_h9_to_h24 <- bind_rows(h9_to_h15_tags_act, h12_to_h18_tags_act, h15_to_h21_tags_act, h18_to_h24_tags_act) %>%
   dplyr::select(Isoform) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/activated_h9_to_h24_isoforms.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h9_to_h24_isoforms.csv')
 
 # convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
 activated_h9_to_h24_AGI <- activated_h9_to_h24 %>% 
@@ -728,8 +730,8 @@ activated_h9_to_h24_AGI <- activated_h9_to_h24 %>%
 
 activated_h9_to_h24_AGI_distinct <- activated_h9_to_h24_AGI %>%
   dplyr::select(gene_ID) %>% 
-  distinct() %>% 
-  write_csv('./01_tidy_data/activated_h9_to_h24_AGI_distinct.csv')
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h9_to_h24_AGI_distinct.csv')
 
 # associate with a TFcluster number
 inner_join_clusters_h9_h24_distinct_act <- inner_join(TF_network_clusters, activated_h9_to_h24_AGI_distinct)
@@ -769,8 +771,8 @@ act_h9_h24_fishers_pval <- act_h9_h24_fishers_p %>%
 
 act_inner_join_clusters_h9_h24_distinct_count_Odds_pval <- inner_join_clusters_h9_h24_distinct_act_count %>% 
   bind_cols(act_h9_h24_fishers_Odds, act_h9_h24_fishers_pval) %>% 
-  dplyr::rename(number_in_cluster = n) %>% 
-  write_csv('./01_tidy_data/h9_h24_activated_odds_p_val.csv')
+  dplyr::rename(number_in_cluster = n) 
+#%>% write_csv('./01_tidy_data/h9_h24_activated_odds_p_val.csv')
 
 act_h9_h24_odds_heatmap1 <- act_inner_join_clusters_h9_h24_distinct_count_Odds_pval %>%
   mutate(time_points = "late") %>% 
@@ -858,10 +860,10 @@ cluster9_genes_isoforms_rep <- repressed_h0_to_h15_AGI %>%
   inner_join(cluster9_h0_h15_rep, by= 'gene_ID') %>% 
   dplyr::select(-gene_ID)
 
-write_csv(cluster9_genes_isoforms_rep, 'cluster9_genes_isoforms_rep.csv')
+#write_csv(cluster9_genes_isoforms_rep, 'cluster9_genes_isoforms_rep.csv')
 
 # write the just gene_IDs to file
-write_csv(cluster9_h0_h15_rep, 'cluster9_h0_h15_rep.csv')
+#write_csv(cluster9_h0_h15_rep, 'cluster9_h0_h15_rep.csv')
 
 # get gene descriptions from TAIR add to the 'genes_ID' file then read back in
 cluster9_gene_ids_rep <- read_csv('cluster9_h0_h15_rep_with_gene_IDs.csv')
@@ -872,7 +874,7 @@ cluster9_h0_h15_rep_with_gene_IDs <- cluster9_gene_ids_rep %>%
 
 #colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
 
-write_csv(cluster9_h0_h15_rep_with_gene_IDs, 'cluster9_h0_h15_rep_with_gene_IDs.csv')
+#write_csv(cluster9_h0_h15_rep_with_gene_IDs, 'cluster9_h0_h15_rep_with_gene_IDs.csv')
 
 #cluster9_h0_h15_rep_isoforms
 cluster9_h0_h15_rep_isoforms_z_scores <- cluster9_genes_isoforms_rep %>% 
@@ -929,10 +931,10 @@ cluster20_genes_isoforms_rep <- repressed_h0_to_h15_AGI %>%
   inner_join(cluster20_h0_h15_rep, by= 'gene_ID') %>% 
   dplyr::select(-gene_ID)
 
-write_csv(cluster20_genes_isoforms_rep, 'cluster20_genes_isoforms_rep.csv')
+#write_csv(cluster20_genes_isoforms_rep, 'cluster20_genes_isoforms_rep.csv')
 
 # write the just gene_IDs to file
-write_csv(cluster20_h0_h15_rep, 'cluster20_h0_h15_rep.csv')
+#write_csv(cluster20_h0_h15_rep, 'cluster20_h0_h15_rep.csv')
 
 cluster20_gene_ids_rep <- read_csv('cluster20_h0_h15_rep_gene_id.csv')
 
@@ -942,7 +944,7 @@ cluster20_h0_h15_rep_with_gene_IDs <- cluster20_gene_ids_rep %>%
 
 #colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
 
-write_csv(cluster20_h0_h15_rep_with_gene_IDs, 'cluster20_h0_h15_rep_with_gene_IDs.csv')
+#write_csv(cluster20_h0_h15_rep_with_gene_IDs, 'cluster20_h0_h15_rep_with_gene_IDs.csv')
 
 cluster20_h0_h15_rep_isoforms_z_scores <- cluster20_genes_isoforms_rep %>% 
   inner_join(transcript_recovered_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
@@ -998,10 +1000,10 @@ cluster25_genes_isoforms_rep <- repressed_h0_to_h15_AGI %>%
   inner_join(cluster25_h0_h15_rep, by= 'gene_ID') %>% 
   dplyr::select(-gene_ID)
 
-write_csv(cluster25_genes_isoforms_rep, 'cluster25_genes_isoforms_rep.csv')
+#write_csv(cluster25_genes_isoforms_rep, 'cluster25_genes_isoforms_rep.csv')
 
 # write the just gene_IDs to file
-write_csv(cluster25_h0_h15_rep, 'cluster25_h0_h15_rep.csv')
+#write_csv(cluster25_h0_h15_rep, 'cluster25_h0_h15_rep.csv')
 
 cluster25_gene_ids_rep <- read_csv('cluster25_h0_h15_rep_gene_id.csv')
 
@@ -1011,7 +1013,7 @@ cluster25_h0_h15_rep_with_gene_IDs <- cluster25_gene_ids_rep %>%
 
 #colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
 
-write_csv(cluster25_h0_h15_rep_with_gene_IDs, 'cluster25_h0_h15_rep_with_gene_IDs.csv')
+#write_csv(cluster25_h0_h15_rep_with_gene_IDs, 'cluster25_h0_h15_rep_with_gene_IDs.csv')
 
 cluster25_h0_h15_rep_isoforms_z_scores <- cluster25_h0_h15_rep_isoforms %>% 
   inner_join(transcript_recovered_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
@@ -1067,10 +1069,10 @@ cluster17_genes_isoforms_act <- activated_h9_to_h24_AGI %>%
   inner_join(cluster17_h9_h24_act, by = 'gene_ID') %>% 
   dplyr::select(-gene_ID)
 
-write_csv(cluster17_genes_isoforms_act, 'cluster17_genes_isoforms_act.csv')
+#write_csv(cluster17_genes_isoforms_act, 'cluster17_genes_isoforms_act.csv')
 
 # write the just gene_IDs to file
-write_csv(cluster17_h9_h24_act, 'cluster17_h9_h24_act.csv')
+#write_csv(cluster17_h9_h24_act, 'cluster17_h9_h24_act.csv')
 
 cluster17_gene_ids_act <- read_csv('cluster17_h9_h24_act_gene_id.csv')
 
@@ -1080,7 +1082,7 @@ cluster17_h9_h24_act_with_gene_IDs <- cluster17_gene_ids_act %>%
 
 #colnames(cluster9_h0_h15_rep_with_gene_IDs)[2] <- "Isoform"
 
-write_csv(cluster17_h9_h24_act_with_gene_IDs, 'cluster17_h9_h24_act_with_gene_IDs.csv')
+#write_csv(cluster17_h9_h24_act_with_gene_IDs, 'cluster17_h9_h24_act_with_gene_IDs.csv')
 
 cluster17_h9_h24_act_isoforms_z_scores <- cluster17_genes_isoforms_act %>% 
   inner_join(transcript_recovered_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
@@ -1158,8 +1160,8 @@ h0_h15_extract_pivot_ANOVAs_stats <- repressed_h0_to_h15_ANOVA_prep_clusters %>%
                             p.value <= 0.05 & p.value > 0.01 ~ '1_star',
                             TRUE ~ 'ns'))
 
-h0_h15_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("rep_h0_h15_1_star.csv")
+h0_h15_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("rep_h0_h15_1_star.csv")
 
 h0_h15_extract_pivot_ANOVAs_stats_summary <- h0_h15_extract_pivot_ANOVAs_stats %>% 
   group_by(p_flag) %>% 
@@ -1200,8 +1202,8 @@ h9_h24_extract_pivot_ANOVAs_stats <- repressed_h9_to_h24_ANOVA_prep_clusters %>%
                             p.value <= 0.05 & p.value > 0.01 ~ '1_star',
                             TRUE ~ 'ns')) 
 
-h9_h24_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("rep_h9_h24_1_star.csv")
+h9_h24_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("rep_h9_h24_1_star.csv")
 
 h9_h24_extract_pivot_ANOVAs_stats_summary <- h9_h24_extract_pivot_ANOVAs_stats %>% 
   group_by(p_flag) %>% 
@@ -1242,8 +1244,8 @@ h0_h15_extract_act_pivot_ANOVAs_stats <- activated_h0_to_h15_ANOVA_prep_clusters
                             p.value <= 0.05 & p.value > 0.01 ~ '1_star',
                             TRUE ~ 'ns'))
 
-h0_h15_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("act_h0_h15_1_star.csv")
+h0_h15_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("act_h0_h15_1_star.csv")
 
 h0_h15_extract_act_pivot_ANOVAs_stats_summary <- h0_h15_extract_act_pivot_ANOVAs_stats %>% 
   group_by(p_flag) %>% 
@@ -1284,8 +1286,8 @@ h9_h24_extract_act_pivot_ANOVAs_stats <- activated_h9_to_h24_ANOVA_prep_clusters
                             p.value <= 0.05 & p.value > 0.01 ~ '1_star',
                             TRUE ~ 'ns'))
 
-h9_h24_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') %>% 
-  write_csv("act_h9_h24_1_star.csv")
+h9_h24_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("act_h9_h24_1_star.csv")
 
 h9_h24_extract_act_pivot_ANOVAs_stats_summary <- h9_h24_extract_act_pivot_ANOVAs_stats %>% 
   group_by(p_flag) %>% 
@@ -1306,8 +1308,8 @@ h0_h15_extract_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h0_h1
 
 h0_h15_extract_pivot_ANOVAs_stats_no_ns<-h0_h15_extract_pivot_ANOVAs_stats_no_ns %>% 
   dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("rep_h0_15_ANOVA_by_R.csv")
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("rep_h0_15_ANOVA_by_R.csv")
 
 # *1.14.2 h9 to h24 repressed
 h9_h24_extract_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_pivot_ANOVAs_stats %>% 
@@ -1319,8 +1321,8 @@ h9_h24_extract_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h9_h2
 
 h9_h24_extract_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_pivot_ANOVAs_stats_no_ns %>% 
   dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("rep_h9_24_ANOVA_by_R.csv")
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("rep_h9_24_ANOVA_by_R.csv")
 
 # *1.14.3 h0 to h15 activated
 h0_h15_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_act_pivot_ANOVAs_stats %>% 
@@ -1332,8 +1334,8 @@ h0_h15_extract_act_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h
 
 h0_h15_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_act_pivot_ANOVAs_stats_no_ns %>% 
   dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("act_h0_15_ANOVA_by_R.csv")
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("act_h0_15_ANOVA_by_R.csv")
 
 # *1.14.4 h9 to h24 activated
 h9_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_act_pivot_ANOVAs_stats %>% 
@@ -1345,8 +1347,8 @@ h9_h24_extract_act_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h
 
 h9_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_act_pivot_ANOVAs_stats_no_ns %>% 
   dplyr::arrange(cluster) %>% 
-  complete(.,cluster = 0:74, fill = list(total = 0)) %>% 
-  write_csv("act_h9_24_ANOVA_by_R.csv")
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("act_h9_24_ANOVA_by_R.csv")
 
 # 1.15 UpSetR overlap plot----
 
@@ -1394,12 +1396,12 @@ repressed_distinct <- bind_rows(h0_h15_extract_pivot_ANOVAs_filter_out_ns,
   mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) %>% 
   left_join(., TF_network_clusters) %>%
   mutate_all(as.character) %>%
-  mutate(cluster = replace_na(cluster, 'nd')) %>% 
-  write_csv("repressed_distinct.csv")
+  mutate(cluster = replace_na(cluster, 'nd')) 
+#%>% write_csv("repressed_distinct.csv")
 
 repressed_distinct_AGI <- repressed_distinct %>% 
-  distinct(gene_ID) %>% 
-  write_csv("repressed_distinct_AGI.csv")
+  distinct(gene_ID) 
+#%>% write_csv("repressed_distinct_AGI.csv")
 
 # *1.16.2 activated----
 activated_distinct <- bind_rows(h0_h15_extract_act_pivot_ANOVAs_filter_out_ns,
@@ -1408,12 +1410,12 @@ activated_distinct <- bind_rows(h0_h15_extract_act_pivot_ANOVAs_filter_out_ns,
   mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) %>% 
   left_join(., TF_network_clusters) %>%
   mutate_all(as.character) %>%
-  mutate(cluster = replace_na(cluster, 'nd')) %>% 
-  write_csv("activated_distinct.csv")
+  mutate(cluster = replace_na(cluster, 'nd')) 
+#%>% write_csv("activated_distinct.csv")
 
 activated_distinct_AGI <- activated_distinct %>% 
-  distinct(gene_ID) %>% 
-  write_csv("activated_distinct_AGI.csv")
+  distinct(gene_ID) 
+#%>% write_csv("activated_distinct_AGI.csv")
 
 # 1.17 GO enrich plots----
 At_genes_all<-read.csv('Gene TPM.csv')
@@ -1919,3 +1921,12 @@ cluster17_activated_isoforms_z_scores <- cluster17_genes_isoforms_activated %>%
 ggsave('cluster17_activated_isoforms_z_scores.png', height = 5, width = 4, units = 'in')
 
 cluster17_activated_isoforms_z_scores
+
+nr_repressed <- h0_h15_extract_pivot_ANOVAs %>% 
+  bind_rows(h9_h24_extract_pivot_ANOVAs) %>% distinct(Isoform) %>% 
+  write_csv('./01_tidy_data/repressed_tidy_list_consistentDE.csv')
+
+nr_activated <- h0_h15_extract_act_pivot_ANOVAs %>% 
+  bind_rows(h9_h24_extract_act_pivot_ANOVAs) %>% distinct(Isoform) %>% 
+  write_csv('./01_tidy_data/activated_tidy_list_consistentDE.csv')
+
