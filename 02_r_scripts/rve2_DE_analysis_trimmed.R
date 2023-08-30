@@ -1,0 +1,1250 @@
+# Author: Allan James  
+
+# code for DE analysis of rve2-2/Col-0 RNA-seq data
+
+# 1 Libraries----
+
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("clusterProfiler")
+
+BiocManager::install("org.At.tair.db")
+
+library(readxl)
+library(dplyr)
+library(zoo)
+library(tidyr)
+library(stringr)
+library(forcats)
+library(ggplot2)
+library(waffle)
+library(readr)
+library(RColorBrewer)
+library(patchwork)
+library(magrittr)
+library(ggpubr)
+library(UpSetR)
+library(enrichplot)
+library(clusterProfiler)
+library(ggplot2)
+library(GOplot)
+library(org.At.tair.db)
+library(glue)
+library(broom)
+library(car)
+
+# 2 RNAseq dataset----
+# Temperature & time series RNA-seq experiment
+# read-in dataset
+transcript_RNAseq <- read_excel('./00_raw_data/Suppl Dataset S4.xlsx', sheet = 2)
+
+# rename 1st column
+colnames(transcript_RNAseq)[1] ="Isoform"
+
+# for the transient-cooling day (day 2) calculate the mean for the time-points
+# means are as new columns
+transcript_RNAseq_means <- transcript_RNAseq %>%
+  mutate(Col_T9 = rowMeans(cbind(Col.T9.rep1, Col.T9.rep2, Col.T9.rep3), na.rm = T),
+         Col_T10 = rowMeans(cbind(Col.T10.rep1, Col.T10.rep2, Col.T10.rep3), na.rm = T),
+         Col_T11 = rowMeans(cbind(Col.T11.rep1, Col.T11.rep2, Col.T11.rep3), na.rm = T),
+         Col_T12 = rowMeans(cbind(Col.T12.rep1, Col.T12.rep2, Col.T12.rep3), na.rm = T),
+         Col_T13 = rowMeans(cbind(Col.T13.rep1, Col.T13.rep2, Col.T13.rep3), na.rm = T),
+         Col_T14 = rowMeans(cbind(Col.T14.rep1, Col.T14.rep2, Col.T14.rep3), na.rm = T),
+         Col_T15 = rowMeans(cbind(Col.T15.rep1, Col.T15.rep2, Col.T15.rep3), na.rm = T),
+         Col_T16 = rowMeans(cbind(Col.T16.rep1, Col.T16.rep2, Col.T16.rep3), na.rm = T),
+         Col_T17 = rowMeans(cbind(Col.T17.rep1, Col.T17.rep2, Col.T17.rep3), na.rm = T),
+         Col_T18 = rowMeans(cbind(Col.T18.rep1, Col.T18.rep2, Col.T18.rep3), na.rm = T),
+         rve2_T9 = rowMeans(cbind(Rve2.T9.rep1, Rve2.T9.rep2, Rve2.T9.rep3), na.rm = T),
+         rve2_T10 = rowMeans(cbind(Rve2.T10.rep1, Rve2.T10.rep2, Rve2.T10.rep3), na.rm = T),
+         rve2_T11 = rowMeans(cbind(Rve2.T11.rep1, Rve2.T11.rep2, Rve2.T11.rep3), na.rm = T),
+         rve2_T12 = rowMeans(cbind(Rve2.T12.rep1, Rve2.T12.rep2, Rve2.T12.rep3), na.rm = T),
+         rve2_T13 = rowMeans(cbind(Rve2.T13.rep1, Rve2.T13.rep2, Rve2.T13.rep3), na.rm = T),
+         rve2_T14 = rowMeans(cbind(Rve2.T14.rep1, Rve2.T14.rep2, Rve2.T14.rep3), na.rm = T),
+         rve2_T15 = rowMeans(cbind(Rve2.T15.rep1, Rve2.T15.rep2, Rve2.T15.rep3), na.rm = T),
+         rve2_T16 = rowMeans(cbind(Rve2.T16.rep1, Rve2.T16.rep2, Rve2.T16.rep3), na.rm = T),
+         rve2_T17 = rowMeans(cbind(Rve2.T17.rep1, Rve2.T17.rep2, Rve2.T17.rep3), na.rm = T),
+         rve2_T18 = rowMeans(cbind(Rve2.T18.rep1, Rve2.T18.rep2, Rve2.T18.rep3), na.rm = T)) 
+
+# just select the Isoform and means columns
+transcript_RNAseq_means_select <- transcript_RNAseq_means %>% 
+  dplyr::select(Isoform, Col_T9:Col_T18, rve2_T9:rve2_T18) 
+
+# filter remove rows where the sum of all the day two time-points (rve2-2 and Col-0 samples) are less than TPM 80
+transcript_RNAseq_means_select_filtered_low <- transcript_RNAseq_means_select %>% 
+  mutate(sum_rows = rowSums(across(where(is.numeric)))) %>% 
+  filter(sum_rows >= 80)
+
+# *2.1 time points----
+# function to get time-point data for rve2-2 and Col-0
+
+get_hour_simple <- function(df, var1, var2){
+  
+  hour <- df 
+  
+  hour_select <- df %>% dplyr::select(Isoform, {{var1}}, {{var2}}) 
+  
+  return(hour_select)
+  
+}
+
+h0_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T9, rve2_T9)
+h3_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T10, rve2_T10)
+h6_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T11, rve2_T11)
+h7_5_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T12, rve2_T12)
+h9_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T13, rve2_T13)
+h12_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T14, rve2_T14)
+h15_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T15, rve2_T15)
+h18_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T16, rve2_T16)
+h21_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T17, rve2_T17)
+h24_simple <- get_hour_simple(transcript_RNAseq_means_select_filtered_low, Col_T18, rve2_T18)
+
+# *2.2 DE for time points----
+
+get_consistent_DE <- function(df_time_point, new_col_str, numerator, denominator) {
+  
+  DE_isoforms <- df_time_point %>%
+    mutate({{new_col_str}} := {{numerator}}/{{denominator}}) %>% 
+    dplyr::select(Isoform, {{new_col_str}})
+  
+}
+
+# **2.2.1 repressed----
+
+h0_simple_repressed <- get_consistent_DE(h0_simple, h0_repressed, rve2_T9, Col_T9)
+h3_simple_repressed <- get_consistent_DE(h3_simple, h3_repressed, rve2_T10, Col_T10)
+h6_simple_repressed <- get_consistent_DE(h6_simple, h6_repressed, rve2_T11, Col_T11)
+h7_5_simple_repressed <- get_consistent_DE(h7_5_simple, h7_5_repressed, rve2_T12, Col_T12)
+h9_simple_repressed <- get_consistent_DE(h9_simple, h9_repressed, rve2_T13, Col_T13)
+h12_simple_repressed <- get_consistent_DE(h12_simple, h12_repressed, rve2_T14, Col_T14)
+h15_simple_repressed <- get_consistent_DE(h15_simple, h15_repressed, rve2_T15, Col_T15)
+h18_simple_repressed <- get_consistent_DE(h18_simple, h18_repressed, rve2_T16, Col_T16)
+h21_simple_repressed <- get_consistent_DE(h21_simple, h21_repressed, rve2_T17, Col_T17)
+h24_simple_repressed <- get_consistent_DE(h24_simple, h24_repressed, rve2_T18, Col_T18)
+
+# bind repressed together
+repressed_simple <- bind_cols(h0_simple_repressed,
+                              h3_simple_repressed,
+                              h6_simple_repressed, 
+                              h7_5_simple_repressed,
+                              h9_simple_repressed,
+                              h12_simple_repressed,
+                              h15_simple_repressed,
+                              h18_simple_repressed,
+                              h21_simple_repressed,
+                              h24_simple_repressed) %>% 
+  dplyr::select(1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
+
+# rename first column
+colnames(repressed_simple)[1] ="Isoform"
+
+# **2.2.2 activated----
+
+h0_simple_activated <- get_consistent_DE(h0_simple, h0_activated, Col_T9, rve2_T9)
+h3_simple_activated <- get_consistent_DE(h3_simple, h3_activated, Col_T10, rve2_T10)
+h6_simple_activated <- get_consistent_DE(h6_simple, h6_activated, Col_T11, rve2_T11)
+h7_5_simple_activated <- get_consistent_DE(h7_5_simple, h7_5_activated, Col_T12, rve2_T12)
+h9_simple_activated <- get_consistent_DE(h9_simple, h9_activated, Col_T13, rve2_T13)
+h12_simple_activated <- get_consistent_DE(h12_simple, h12_activated, Col_T14, rve2_T14)
+h15_simple_activated <- get_consistent_DE(h15_simple, h15_activated, Col_T15, rve2_T15)
+h18_simple_activated <- get_consistent_DE(h18_simple, h18_activated, Col_T16, rve2_T16)
+h21_simple_activated <- get_consistent_DE(h21_simple, h21_activated, Col_T17, rve2_T17)
+h24_simple_activated <- get_consistent_DE(h24_simple, h24_activated, Col_T18, rve2_T18)
+
+# bind activated together
+activated_simple <- bind_cols(h0_simple_activated,
+                              h3_simple_activated,
+                              h6_simple_activated, 
+                              h7_5_simple_activated,
+                              h9_simple_activated,
+                              h12_simple_activated,
+                              h15_simple_activated,
+                              h18_simple_activated,
+                              h21_simple_activated,
+                              h24_simple_activated) %>% 
+  dplyr::select(1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
+
+# rename first column
+colnames(activated_simple)[1] ="Isoform"
+
+# *2.3 consistent DE----
+# **2.3.1 consistent repressed----
+
+repressed_simple_flagged <- repressed_simple %>%
+  mutate(consistent_h0_to_h6 = case_when(h0_repressed > 1.2 & h3_repressed > 1.2 & h6_repressed > 1.2 ~ 1, TRUE ~ 0),
+         consistent_h3_to_h9 = case_when((h3_repressed > 1.2 | h6_repressed > 1.2) & h7_5_repressed > 1.2 & h9_repressed > 1.2 ~ 1, TRUE ~ 0),
+         consistent_h6_to_h12 = case_when((h6_repressed > 1.2 | h7_5_repressed > 1.2) & h9_repressed > 1.2 & h12_repressed > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h9_to_h15 = case_when(h9_repressed > 1.2 & h12_repressed > 1.2 & h15_repressed > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h12_to_h18 = case_when(h12_repressed > 1.2 & h15_repressed > 1.2 & h18_repressed > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h15_to_h21 = case_when(h15_repressed > 1.2 & h18_repressed > 1.2 & h21_repressed > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h18_to_h24 = case_when(h18_repressed > 1.2 & h21_repressed > 1.2 & h24_repressed > 1.2  ~ 1, TRUE ~ 0))
+
+# **2.3.2 consistent activated----
+
+activated_simple_flagged <- activated_simple %>%
+  mutate(consistent_h0_to_h6 = case_when(h0_activated > 1.2 & h3_activated > 1.2 & h6_activated > 1.2 ~ 1, TRUE ~ 0),
+         consistent_h3_to_h9 = case_when((h3_activated > 1.2 | h6_activated > 1.2) & h7_5_activated > 1.2 & h9_activated > 1.2 ~ 1, TRUE ~ 0),
+         consistent_h6_to_h12 = case_when((h6_activated > 1.2 | h7_5_activated > 1.2) & h9_activated > 1.2 & h12_activated > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h9_to_h15 = case_when(h9_activated > 1.2 & h12_activated > 1.2 & h15_activated > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h12_to_h18 = case_when(h12_activated > 1.2 & h15_activated > 1.2 & h18_activated > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h15_to_h21 = case_when(h15_activated > 1.2 & h18_activated > 1.2 & h21_activated > 1.2  ~ 1, TRUE ~ 0),
+         consistent_h18_to_h24 = case_when(h18_activated > 1.2 & h21_activated > 1.2 & h24_activated > 1.2  ~ 1, TRUE ~ 0))
+
+# *2.4 consistent DE ranked----
+#ranking of targets in 6hr windows----
+
+get_consistent_windows <- function(df, filter_col, new_col_str1, new_col_str2, new_col_str3, 
+                                   col_to_rank1, col_to_rank2, col_to_rank3,
+                                   new_col_str4) {
+  
+  rank_prep <- df %>% 
+    dplyr::filter({{filter_col}} == 1) %>% 
+    mutate({{new_col_str1}} := dense_rank(dplyr::desc({{col_to_rank1}})),
+           {{new_col_str2}} := dense_rank(dplyr::desc({{col_to_rank2}})),
+           {{new_col_str3}} := dense_rank(dplyr::desc({{col_to_rank3}})))
+  
+  avg_rank <- rank_prep %>% 
+    mutate({{new_col_str4}} := rowMeans(cbind({{new_col_str1}}, {{new_col_str2}}, {{new_col_str3}}))) %>% 
+    arrange({{new_col_str4}})
+  
+  rank_arrange <- avg_rank %>%
+    dplyr::select(Isoform, {{new_col_str4}})
+  
+  return(rank_arrange)
+}
+
+# **2.4.1 consistent repressed ranked----
+
+consistent_h0_to_h6_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h0_to_h6, 
+                                                         h0_rank, h3_rank, h6_rank,
+                                                         h0_repressed, h3_repressed, h6_repressed,
+                                                         mean_rank_h0_to_h6) 
+#%>% write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_rep.csv')
+
+consistent_h3_to_h9_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h3_to_h9, 
+                                                         h3_rank, h6_rank, h9_rank,
+                                                         h3_repressed, h6_repressed, h9_repressed,
+                                                         mean_rank_h3_to_h9) 
+#%>% write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_rep.csv')
+
+consistent_h6_to_h12_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h6_to_h12, 
+                                                          h6_rank, h9_rank, h12_rank,
+                                                          h6_repressed, h9_repressed, h12_repressed,
+                                                          mean_rank_h6_to_h12) 
+#%>% write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_rep.csv')
+
+consistent_h9_to_h15_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h9_to_h15, 
+                                                          h9_rank, h12_rank, h15_rank,
+                                                          h9_repressed, h12_repressed, h15_repressed,
+                                                          mean_rank_h9_to_h15) 
+#%>% write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_rep.csv')
+
+consistent_h12_to_h18_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h12_to_h18, 
+                                                           h12_rank, h15_rank, h18_rank,
+                                                           h12_repressed, h15_repressed, h18_repressed,
+                                                           mean_rank_h12_to_h18) 
+#%>% write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_rep.csv')
+
+consistent_h15_to_h21_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h15_to_h21, 
+                                                           h15_rank, h18_rank, h21_rank,
+                                                           h15_repressed, h18_repressed, h21_repressed,
+                                                           mean_rank_h15_to_h21) 
+#%>% write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_rep.csv')
+
+consistent_h18_to_h24_ranked_rep <- get_consistent_windows(repressed_simple_flagged, consistent_h18_to_h24, 
+                                                           h18_rank, h21_rank, h24_rank,
+                                                           h18_repressed, h21_repressed, h24_repressed,
+                                                           mean_rank_h18_to_h24) 
+#%>% write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_rep.csv')
+
+
+# *2.4.2 consistent activated ranked----
+
+consistent_h0_to_h6_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h0_to_h6, 
+                                                         h0_rank, h3_rank, h6_rank,
+                                                         h0_activated, h3_activated, h6_activated,
+                                                         mean_rank_h0_to_h6) 
+#%>% write_csv('./01_tidy_data/consistent_h0_to_h6_ranked_act.csv')
+
+consistent_h3_to_h9_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h3_to_h9, 
+                                                         h3_rank, h6_rank, h9_rank,
+                                                         h3_activated, h6_activated, h9_activated,
+                                                         mean_rank_h3_to_h9) 
+#%>% write_csv('./01_tidy_data/consistent_h3_to_h9_ranked_act.csv')
+
+consistent_h6_to_h12_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h6_to_h12, 
+                                                          h6_rank, h9_rank, h12_rank,
+                                                          h6_activated, h9_activated, h12_activated,
+                                                          mean_rank_h6_to_h12) 
+#%>% write_csv('./01_tidy_data/consistent_h6_to_h12_ranked_act.csv')
+
+consistent_h9_to_h15_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h9_to_h15, 
+                                                          h9_rank, h12_rank, h15_rank,
+                                                          h9_activated, h12_activated, h15_activated,
+                                                          mean_rank_h9_to_h15) 
+#%>% write_csv('./01_tidy_data/consistent_h9_to_h15_ranked_act.csv')
+
+consistent_h12_to_h18_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h12_to_h18, 
+                                                           h12_rank, h15_rank, h18_rank,
+                                                           h12_activated, h15_activated, h18_activated,
+                                                           mean_rank_h12_to_h18) 
+#%>% write_csv('./01_tidy_data/consistent_h12_to_h18_ranked_act.csv')
+
+consistent_h15_to_h21_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h15_to_h21, 
+                                                           h15_rank, h18_rank, h21_rank,
+                                                           h15_activated, h18_activated, h21_activated,
+                                                           mean_rank_h15_to_h21) 
+#%>% write_csv('./01_tidy_data/consistent_h15_to_h21_ranked_act.csv')
+
+consistent_h18_to_h24_ranked_act <- get_consistent_windows(activated_simple_flagged, consistent_h18_to_h24, 
+                                                           h18_rank, h21_rank, h24_rank,
+                                                           h18_activated, h21_activated, h24_activated,
+                                                           mean_rank_h18_to_h24) 
+#%>% write_csv('./01_tidy_data/consistent_h18_to_h24_ranked_act.csv')
+
+
+# *2.5 split the isoform tag----
+
+split_isoforms <- function(df, new_col_str1, new_col_str2, new_col_str3) {
+  
+  isoform_col <- df %>% 
+    dplyr::select(Isoform)
+  
+  tags <- isoform_col %>% 
+    mutate({{new_col_str1}} := str_split(Isoform, "_", simplify = TRUE)[ ,2],
+           {{new_col_str2}} := str_split(Isoform, "[.]", simplify = TRUE)[ ,2]) %>%
+    unite({{new_col_str3}}, {{new_col_str1}} : {{new_col_str2}}, sep ="")
+  
+  return(tags)
+  
+}
+
+h0_to_h6_tags_rep <- split_isoforms(consistent_h0_to_h6_ranked_rep, tag1, tag2, tags)
+h3_to_h9_tags_rep <- split_isoforms(consistent_h3_to_h9_ranked_rep, tag1, tag2, tags)
+h6_to_h12_tags_rep <- split_isoforms(consistent_h6_to_h12_ranked_rep, tag1, tag2, tags)
+h9_to_h15_tags_rep <- split_isoforms(consistent_h9_to_h15_ranked_rep, tag1, tag2, tags)
+h12_to_h18_tags_rep <- split_isoforms(consistent_h12_to_h18_ranked_rep, tag1, tag2, tags)
+h15_to_h21_tags_rep <- split_isoforms(consistent_h15_to_h21_ranked_rep, tag1, tag2, tags)
+h18_to_h24_tags_rep <- split_isoforms(consistent_h18_to_h24_ranked_rep, tag1, tag2, tags)
+
+h0_to_h6_tags_act <- split_isoforms(consistent_h0_to_h6_ranked_act, tag1, tag2, tags)
+h3_to_h9_tags_act <- split_isoforms(consistent_h3_to_h9_ranked_act, tag1, tag2, tags)
+h6_to_h12_tags_act <- split_isoforms(consistent_h6_to_h12_ranked_act, tag1, tag2, tags)
+h9_to_h15_tags_act <- split_isoforms(consistent_h9_to_h15_ranked_act, tag1, tag2, tags)
+h12_to_h18_tags_act <- split_isoforms(consistent_h12_to_h18_ranked_act, tag1, tag2, tags)
+h15_to_h21_tags_act <- split_isoforms(consistent_h15_to_h21_ranked_act, tag1, tag2, tags)
+h18_to_h24_tags_act <- split_isoforms(consistent_h18_to_h24_ranked_act, tag1, tag2, tags)
+
+# *2.6 count the isoform tag----
+count_isoforms <- function(df, col_to_count, new_col_str1, new_col_str2, new_col_str3) {
+  
+  count <- df %>% 
+    count({{col_to_count}}) %>% 
+    mutate({{new_col_str1}} := round((n/sum(n)*100), 1))
+  
+  rank_and_group <- count %>%
+    mutate({{new_col_str2}} := rank(-percent),
+           {{new_col_str3}} := ifelse(percent >= 5, {{col_to_count}}, 'Others'))
+  
+  return(rank_and_group)
+}
+
+# repressed
+h0_to_h6_tags_count_rep <- count_isoforms(h0_to_h6_tags_rep, tags, percent, rank, group)
+h3_to_h9_tags_count_rep <- count_isoforms(h3_to_h9_tags_rep, tags, percent, rank, group)
+h6_to_h12_tags_count_rep <- count_isoforms(h6_to_h12_tags_rep, tags, percent, rank, group)
+h9_to_h15_tags_count_rep <- count_isoforms(h9_to_h15_tags_rep, tags, percent, rank, group)
+h12_to_h18_tags_count_rep <- count_isoforms(h12_to_h18_tags_rep, tags, percent, rank, group)
+h15_to_h21_tags_count_rep <- count_isoforms(h15_to_h21_tags_rep, tags, percent, rank, group)
+h18_to_h24_tags_count_rep <- count_isoforms(h18_to_h24_tags_rep, tags, percent, rank, group)
+
+# activated
+h0_to_h6_tags_count_act <- count_isoforms(h0_to_h6_tags_act, tags, percent, rank, group)
+h3_to_h9_tags_count_act <- count_isoforms(h3_to_h9_tags_act, tags, percent, rank, group)
+h6_to_h12_tags_count_act <- count_isoforms(h6_to_h12_tags_act, tags, percent, rank, group)
+h9_to_h15_tags_count_act <- count_isoforms(h9_to_h15_tags_act, tags, percent, rank, group)
+h12_to_h18_tags_count_act <- count_isoforms(h12_to_h18_tags_act, tags, percent, rank, group)
+h15_to_h21_tags_count_act <- count_isoforms(h15_to_h21_tags_act, tags, percent, rank, group)
+h18_to_h24_tags_count_act <- count_isoforms(h18_to_h24_tags_act, tags, percent, rank, group)
+
+# 3 ANOVA----
+# *3.1 TF network clusters----
+# requires data from the Calixto et al TF clusters
+
+# 7302 gene loci grouped in 75 clusters (0-74); error in row 5772
+TF_network_clusters <- read_csv('./00_raw_data/TF Network Cluster Nov2018 long format.csv') %>%
+  filter(!row_number() %in% 5772)
+
+# count of gene loci in each TF cluster
+TF_network_clusters_count <-  TF_network_clusters %>% 
+  group_by(cluster) %>%
+  summarise(cluster_number = n())
+
+# *3.2 repressed h0 to h15----
+
+# combine consistent groups
+repressed_h0_to_h15 <- bind_rows(h0_to_h6_tags_rep, h3_to_h9_tags_rep, h6_to_h12_tags_rep, h9_to_h15_tags_rep) %>%
+  dplyr::select(Isoform) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h0_to_h15_isoforms.csv')
+
+# convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
+repressed_h0_to_h15_AGI <- repressed_h0_to_h15 %>% 
+  mutate(gene_ID = substr(Isoform, start = 1, stop = 9))
+
+# select just the AGI and reduce to distinct AGI
+repressed_h0_to_h15_AGI_distinct <- repressed_h0_to_h15_AGI %>%
+  dplyr::select(gene_ID) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h0_to_h15_AGI_distinct.csv')
+
+h0_h15_extract <- transcript_RNAseq %>% 
+  filter(Isoform %in% repressed_h0_to_h15_AGI$Isoform)
+
+h0_h15_extract_pivot <- h0_h15_extract %>%
+  dplyr::select(Isoform, Col.T9.rep1:Col.T15.rep1, Col.T9.rep2:Col.T15.rep2, Col.T9.rep3:Col.T15.rep3,
+                Rve2.T9.rep1:Rve2.T15.rep1, Rve2.T9.rep2:Rve2.T15.rep2, Rve2.T9.rep3:Rve2.T15.rep3) %>% 
+  pivot_longer(cols = c(Col.T9.rep1:Rve2.T15.rep3),
+               names_to = c('genotype', 'time_point', 'rep'),
+               names_sep = "\\.",
+               values_to ='TPM')
+
+h0_h15_extract_pivot_ANOVAs <- h0_h15_extract_pivot %>%
+  group_by(Isoform) %>%
+  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
+  ungroup %>% 
+  filter(term == 'genotype') %>%
+  dplyr::select(c(1,6))
+
+repressed_h0_to_h15_ANOVA_prep_clusters <-repressed_h0_to_h15_AGI %>% 
+  left_join(TF_network_clusters, by = 'gene_ID') %>% 
+  mutate_all(as.character) %>% 
+  mutate(cluster = replace_na(cluster, 'nd'))
+
+h0_h15_extract_pivot_ANOVAs_stats <- repressed_h0_to_h15_ANOVA_prep_clusters %>% 
+  left_join(h0_h15_extract_pivot_ANOVAs, by = 'Isoform') %>% 
+  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
+                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
+                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
+                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
+                            TRUE ~ 'ns'))
+
+h0_h15_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("rep_h0_h15_1_star.csv")
+
+h0_h15_extract_pivot_ANOVAs_stats_summary <- h0_h15_extract_pivot_ANOVAs_stats %>% 
+  group_by(p_flag) %>% 
+  summarise(total = n()) %>% 
+  mutate(freq = round(total / sum(total) *100, 1)) %>% 
+  arrange(desc(freq))
+
+# *3.3 repressed h9 to h24----
+
+repressed_h9_to_h24 <- bind_rows(h9_to_h15_tags_rep, h12_to_h18_tags_rep, h15_to_h21_tags_rep, h18_to_h24_tags_rep) %>%
+  dplyr::select(Isoform) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h9_to_h24_isoforms.csv')
+
+# convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
+repressed_h9_to_h24_AGI <- repressed_h9_to_h24 %>% 
+  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) 
+
+# select just the AGI and reduce to distinct AGI
+repressed_h9_to_h24_AGI_distinct <- repressed_h9_to_h24_AGI %>%
+  dplyr::select(gene_ID) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/repressed_h9_to_h24_AGI_distinct.csv')
+
+h9_h24_extract <- transcript_RNAseq %>% 
+  filter(Isoform %in% repressed_h9_to_h24_AGI$Isoform)
+
+h9_h24_extract_pivot <- h9_h24_extract %>%
+  dplyr::select(Isoform, Col.T13.rep1:Col.T18.rep1, Col.T13.rep2:Col.T18.rep2, Col.T13.rep3:Col.T18.rep3,
+                Rve2.T13.rep1:Rve2.T18.rep1, Rve2.T13.rep2:Rve2.T18.rep2, Rve2.T13.rep3:Rve2.T18.rep3) %>% 
+  pivot_longer(cols = c(Col.T13.rep1:Rve2.T18.rep3),
+               names_to = c('genotype', 'time_point', 'rep'),
+               names_sep = "\\.",
+               values_to ='TPM')
+
+h9_h24_extract_pivot_ANOVAs <- h9_h24_extract_pivot %>%
+  group_by(Isoform) %>%
+  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
+  ungroup %>% 
+  filter(term == 'genotype') %>%
+  dplyr::select(c(1,6))
+
+repressed_h9_to_h24_ANOVA_prep_clusters <-repressed_h9_to_h24_AGI %>% 
+  left_join(TF_network_clusters, by = 'gene_ID') %>% 
+  mutate_all(as.character) %>% 
+  mutate(cluster = replace_na(cluster, 'nd'))
+
+h9_h24_extract_pivot_ANOVAs_stats <- repressed_h9_to_h24_ANOVA_prep_clusters %>% 
+  left_join(h9_h24_extract_pivot_ANOVAs, by = 'Isoform') %>% 
+  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
+                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
+                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
+                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
+                            TRUE ~ 'ns')) 
+
+h9_h24_extract_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("rep_h9_h24_1_star.csv")
+
+h9_h24_extract_pivot_ANOVAs_stats_summary <- h9_h24_extract_pivot_ANOVAs_stats %>% 
+  group_by(p_flag) %>% 
+  summarise(total = n()) %>% 
+  mutate(freq = round(total / sum(total) *100, 1)) %>% 
+  arrange(desc(freq))
+
+# *3.3 activated h0 to h15----
+
+activated_h0_to_h15 <- bind_rows(h0_to_h6_tags_act, h3_to_h9_tags_act, h6_to_h12_tags_act, h9_to_h15_tags_act) %>%
+  dplyr::select(Isoform) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h0_to_h15_isoforms.csv')
+
+# convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
+activated_h0_to_h15_AGI <- activated_h0_to_h15 %>% 
+  mutate(gene_ID = substr(Isoform, start = 1, stop = 9))
+
+# select just the AGI and reduce to distinct AGI
+activated_h0_to_h15_AGI_distinct <- activated_h0_to_h15_AGI %>%
+  dplyr::select(gene_ID) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h0_to_h15_AGI_distinct.csv')
+
+h0_h15_extract_act <- transcript_RNAseq %>% 
+  filter(Isoform %in% activated_h0_to_h15_AGI$Isoform)
+
+h0_h15_extract_act_pivot <- h0_h15_extract_act %>%
+  dplyr::select(Isoform, Col.T9.rep1:Col.T15.rep1, Col.T9.rep2:Col.T15.rep2, Col.T9.rep3:Col.T15.rep3,
+                Rve2.T9.rep1:Rve2.T15.rep1, Rve2.T9.rep2:Rve2.T15.rep2, Rve2.T9.rep3:Rve2.T15.rep3) %>% 
+  pivot_longer(cols = c(Col.T9.rep1:Rve2.T15.rep3),
+               names_to = c('genotype', 'time_point', 'rep'),
+               names_sep = "\\.",
+               values_to ='TPM')
+
+h0_h15_extract_act_pivot_ANOVAs <- h0_h15_extract_act_pivot %>%
+  group_by(Isoform) %>%
+  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
+  ungroup %>% 
+  filter(term == 'genotype') %>%
+  dplyr::select(c(1,6))
+
+activated_h0_to_h15_ANOVA_prep_clusters <-activated_h0_to_h15_AGI %>% 
+  left_join(TF_network_clusters, by = 'gene_ID') %>% 
+  mutate_all(as.character) %>% 
+  mutate(cluster = replace_na(cluster, 'nd'))
+
+h0_h15_extract_act_pivot_ANOVAs_stats <- activated_h0_to_h15_ANOVA_prep_clusters %>% 
+  left_join(h0_h15_extract_act_pivot_ANOVAs, by = 'Isoform') %>% 
+  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
+                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
+                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
+                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
+                            TRUE ~ 'ns'))
+
+h0_h15_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("act_h0_h15_1_star.csv")
+
+h0_h15_extract_act_pivot_ANOVAs_stats_summary <- h0_h15_extract_act_pivot_ANOVAs_stats %>% 
+  group_by(p_flag) %>% 
+  summarise(total = n()) %>% 
+  mutate(freq = round(total / sum(total) *100, 1)) %>% 
+  arrange(desc(freq))
+
+# *3.4 activated h9 to h24----
+
+activated_h9_to_h24 <- bind_rows(h9_to_h15_tags_act, h12_to_h18_tags_act, h15_to_h21_tags_act, h18_to_h24_tags_act) %>%
+  dplyr::select(Isoform) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h9_to_h24_isoforms.csv')
+
+# convert AGI_IsoformTag into AGI - could be multiple AGIs i.e. ATxxxxxxx.1 and ATxxxxxxx_ID2 will aggregate to two times ATxxxxxxx
+activated_h9_to_h24_AGI <- activated_h9_to_h24 %>% 
+  mutate(gene_ID = substr(Isoform, start = 1, stop = 9))
+
+# select just the AGI and reduce to distinct AGI
+activated_h9_to_h24_AGI_distinct <- activated_h9_to_h24_AGI %>%
+  dplyr::select(gene_ID) %>% 
+  distinct() 
+#%>% write_csv('./01_tidy_data/activated_h9_to_h24_AGI_distinct.csv')
+
+h9_h24_extract_act <- transcript_RNAseq %>% 
+  filter(Isoform %in% activated_h9_to_h24_AGI$Isoform)
+
+h9_h24_extract_act_pivot <- h9_h24_extract_act %>%
+  dplyr::select(Isoform, Col.T13.rep1:Col.T18.rep1, Col.T13.rep2:Col.T18.rep2, Col.T13.rep3:Col.T18.rep3,
+                Rve2.T13.rep1:Rve2.T18.rep1, Rve2.T13.rep2:Rve2.T18.rep2, Rve2.T13.rep3:Rve2.T18.rep3) %>% 
+  pivot_longer(cols = c(Col.T13.rep1:Rve2.T18.rep3),
+               names_to = c('genotype', 'time_point', 'rep'),
+               names_sep = "\\.",
+               values_to ='TPM')
+
+h9_h24_extract_act_pivot_ANOVAs <- h9_h24_extract_act_pivot %>%
+  group_by(Isoform) %>%
+  do(broom::tidy(Anova(lm(TPM ~ time_point + genotype, data = .), type = 'II'))) %>%
+  ungroup %>% 
+  filter(term == 'genotype') %>%
+  dplyr::select(c(1,6))
+
+activated_h9_to_h24_ANOVA_prep_clusters <-activated_h9_to_h24_AGI %>% 
+  left_join(TF_network_clusters, by = 'gene_ID') %>% 
+  mutate_all(as.character) %>% 
+  mutate(cluster = replace_na(cluster, 'nd'))
+
+h9_h24_extract_act_pivot_ANOVAs_stats <- activated_h9_to_h24_ANOVA_prep_clusters %>% 
+  left_join(h9_h24_extract_act_pivot_ANOVAs, by = 'Isoform') %>% 
+  mutate(p_flag = case_when(p.value <= 0.0001 ~ '4_star', 
+                            p.value <= 0.001 & p.value > 0.0001 ~ '3_star',
+                            p.value <= 0.01 & p.value > 0.001 ~ '2_star',
+                            p.value <= 0.05 & p.value > 0.01 ~ '1_star',
+                            TRUE ~ 'ns'))
+
+h9_h24_extract_act_pivot_ANOVAs_stats %>% filter(p_flag == '1_star') 
+#%>% write_csv("act_h9_h24_1_star.csv")
+
+h9_h24_extract_act_pivot_ANOVAs_stats_summary <- h9_h24_extract_act_pivot_ANOVAs_stats %>% 
+  group_by(p_flag) %>% 
+  summarise(total = n()) %>% 
+  mutate(freq = round(total / sum(total) *100, 1)) %>% 
+  arrange(desc(freq))
+
+# 4 ANOVA enrichment----
+# final plot made in GraphPad Prism
+
+# *4.1 h0 to h15 repressed----
+h0_h15_extract_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_pivot_ANOVAs_stats %>% 
+  filter(!p_flag == 'ns') %>% 
+  group_by(cluster) %>% 
+  summarise(total = n()) 
+
+h0_h15_extract_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h0_h15_extract_pivot_ANOVAs_stats_no_ns$cluster))
+
+h0_h15_extract_pivot_ANOVAs_stats_no_ns<-h0_h15_extract_pivot_ANOVAs_stats_no_ns %>% 
+  dplyr::arrange(cluster) %>% 
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("rep_h0_15_ANOVA_by_R.csv")
+
+# *4.2 h9 to h24 repressed----
+h9_h24_extract_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_pivot_ANOVAs_stats %>% 
+  filter(!p_flag == 'ns') %>% 
+  group_by(cluster) %>% 
+  summarise(total = n()) 
+
+h9_h24_extract_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h9_h24_extract_pivot_ANOVAs_stats_no_ns$cluster))
+
+h9_h24_extract_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_pivot_ANOVAs_stats_no_ns %>% 
+  dplyr::arrange(cluster) %>% 
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("rep_h9_24_ANOVA_by_R.csv")
+
+# *4.3 h0 to h15 activated----
+h0_h15_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_act_pivot_ANOVAs_stats %>% 
+  filter(!p_flag == 'ns') %>% 
+  group_by(cluster) %>% 
+  summarise(total = n()) 
+
+h0_h15_extract_act_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h0_h15_extract_act_pivot_ANOVAs_stats_no_ns$cluster))
+
+h0_h15_extract_act_pivot_ANOVAs_stats_no_ns <- h0_h15_extract_act_pivot_ANOVAs_stats_no_ns %>% 
+  dplyr::arrange(cluster) %>% 
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("act_h0_15_ANOVA_by_R.csv")
+
+# *4.4 h9 to h24 activated----
+h9_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_act_pivot_ANOVAs_stats %>% 
+  filter(!p_flag == 'ns') %>% 
+  group_by(cluster) %>% 
+  summarise(total = n()) 
+
+h9_h24_extract_act_pivot_ANOVAs_stats_no_ns$cluster <- as.numeric(as.character(h9_h24_extract_act_pivot_ANOVAs_stats_no_ns$cluster))
+
+h9_h24_extract_act_pivot_ANOVAs_stats_no_ns <- h9_h24_extract_act_pivot_ANOVAs_stats_no_ns %>% 
+  dplyr::arrange(cluster) %>% 
+  complete(.,cluster = 0:74, fill = list(total = 0)) 
+#%>% write_csv("act_h9_24_ANOVA_by_R.csv")
+
+# 5 UpSetR overlap plot----
+
+h0_h15_extract_pivot_ANOVAs_filter_out_ns <- h0_h15_extract_pivot_ANOVAs %>% 
+  filter(! p.value > 0.05)
+
+h9_h24_extract_pivot_ANOVAs_filter_out_ns <- h9_h24_extract_pivot_ANOVAs %>% 
+  filter(! p.value > 0.05)
+
+h0_h15_extract_act_pivot_ANOVAs_filter_out_ns <- h0_h15_extract_act_pivot_ANOVAs %>% 
+  filter(! p.value > 0.05)
+
+h9_h24_extract_act_pivot_ANOVAs_filter_out_ns <- h9_h24_extract_act_pivot_ANOVAs %>% 
+  filter(! p.value > 0.05)
+
+# filter out CCX2 and LBD11 from the h0_h15_extract_pivot_ANOVAs_filter_out_ns dataset due to tp 7.5 issue
+h0_h15_extract_pivot_ANOVAs_filter_out_ns <- h0_h15_extract_pivot_ANOVAs_filter_out_ns %>% 
+  filter(! Isoform == 'AT5G17850_P1' & ! Isoform == 'AT2G28500_P1')
+
+myGeneSets <- list('repressed early' = h0_h15_extract_pivot_ANOVAs_filter_out_ns$Isoform,
+                   'repressed late' = h9_h24_extract_pivot_ANOVAs_filter_out_ns$Isoform,
+                   'activated early' = h0_h15_extract_act_pivot_ANOVAs_filter_out_ns$Isoform,
+                   'activated late' = h9_h24_extract_act_pivot_ANOVAs_filter_out_ns$Isoform
+)
+
+h0_h15_extract_pivot_ANOVAs_filter_out_ns %>% filter(Isoform %in% 'AT5G17850_P1')
+
+# fromList: a function to convert a list of named vectors to a data frame compatible with UpSetR
+sets <- fromList(myGeneSets)
+
+UpSet<-upset(sets, nsets=4, keep.order = T, sets = c("repressed early", "repressed late",
+                                                     "activated early", "activated late"),
+             sets.bar.color= c('#D53E4F', '#D53E4F', '#4DAF4A', '#4DAF4A'), matrix.color= 'grey30', point.size = 2.5, sets.x.label = "Consistent DE groups", mainbar.y.label = "Sizes of intersections")
+UpSet
+png("Upset_repressed_and_activated_early_late.png", width = 4, height = 3, units = 'in', res = 300)
+UpSet
+
+dev.off()
+
+# 6 Non-redundant isoform lists----
+# *6.1 repressed----
+repressed_distinct <- bind_rows(h0_h15_extract_pivot_ANOVAs_filter_out_ns,
+                                h9_h24_extract_pivot_ANOVAs_filter_out_ns) %>% 
+  distinct(Isoform) %>%
+  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) %>% 
+  left_join(., TF_network_clusters) %>%
+  mutate_all(as.character) %>%
+  mutate(cluster = replace_na(cluster, 'nd')) 
+#%>% write_csv("repressed_distinct.csv")
+
+repressed_distinct_AGI <- repressed_distinct %>% 
+  distinct(gene_ID) 
+#%>% write_csv("repressed_distinct_AGI.csv")
+
+# 1097 repressed isoforms - one distinct isoform id
+nr_repressed <- h0_h15_extract_pivot_ANOVAs %>% 
+  bind_rows(h9_h24_extract_pivot_ANOVAs) %>% distinct(Isoform) 
+#%>% write_csv('./01_tidy_data/repressed_tidy_list_consistentDE.csv')
+
+# *6.2 activated----
+activated_distinct <- bind_rows(h0_h15_extract_act_pivot_ANOVAs_filter_out_ns,
+                                h9_h24_extract_act_pivot_ANOVAs_filter_out_ns) %>% 
+  distinct(Isoform) %>%
+  mutate(gene_ID = substr(Isoform, start = 1, stop = 9)) %>% 
+  left_join(., TF_network_clusters) %>%
+  mutate_all(as.character) %>%
+  mutate(cluster = replace_na(cluster, 'nd')) 
+#%>% write_csv("activated_distinct.csv")
+
+activated_distinct_AGI <- activated_distinct %>% 
+  distinct(gene_ID) 
+#%>% write_csv("activated_distinct_AGI.csv")
+
+# 1446 activated isoforms - one distinct isoform id
+nr_activated <- h0_h15_extract_act_pivot_ANOVAs %>% 
+  bind_rows(h9_h24_extract_act_pivot_ANOVAs) %>% distinct(Isoform) 
+#%>% write_csv('./01_tidy_data/activated_tidy_list_consistentDE.csv')
+
+# 7 GO enrich plots----
+At_genes_all<-read.csv('./00_raw_data/Gene TPM.csv')
+all_genes<- At_genes_all[,1]
+
+# *7.1 GO repressed----
+GO_analysis <- enrichGO(gene = repressed_distinct_AGI$gene_ID,
+                        universe = all_genes,
+                        OrgDb = org.At.tair.db,
+                        keyType = "TAIR",
+                        ont = "BP",
+                        pAdjustMethod = "BH",
+                        pvalueCutoff = 0.05,
+                        qvalueCutoff = 0.10,
+                        readable = TRUE,
+                        pool = TRUE)
+
+dotplot(GO_analysis, showCategory=10, font.size=12, label_format = 55)
+dp_repressed <- dotplot(GO_analysis, showCategory=10, font.size=12, label_format = 55)
+
+dp_repressed <-  dp_repressed + ggtitle("Repressed DE group")
+ggsave('dp_repressed_GO.png', dp_repressed, height=3,width=9.5,units="in",dpi=200)
+
+# *7.2 GO activated----
+GO_analysis_act <- enrichGO(gene = activated_distinct_AGI$gene_ID,
+                            universe = all_genes,
+                            OrgDb = org.At.tair.db,
+                            keyType = "TAIR",
+                            ont = "BP",
+                            pAdjustMethod = "BH",
+                            pvalueCutoff = 0.05,
+                            qvalueCutoff = 0.10,
+                            readable = TRUE,
+                            pool = TRUE)
+
+dotplot(GO_analysis_act, showCategory=10, font.size=12, label_format = 55)
+dp_activated <- dotplot(GO_analysis_act, showCategory=10, font.size=12, label_format = 55)
+
+dp_activated <-  dp_activated + ggtitle("Activated DE group")
+ggsave('dp_activated_GO.png', dp_activated, height=3,width=9.5,units="in",dpi=200)
+
+GO_rep_act <- dp_repressed / dp_activated 
+
+GO_rep_act_horizontal <- dp_repressed + dp_activated
+
+GO_rep_act_horizontal_new <- dp_repressed_new + dp_activated_new
+
+ggsave('GO_rep_act_horiz_new.png', GO_rep_act_horizontal_new, height=4,width=18,units="in",dpi=200)
+
+# 8 Odd plots on h0-24 repressed and activated sets----
+# *8.1 repressed----
+# associate with a TFcluster number
+inner_join_clusters_repressed <- inner_join(TF_network_clusters, repressed_distinct_AGI)
+
+inner_join_clusters_repressed_count <- inner_join_clusters_repressed %>%
+  group_by(cluster) %>%
+  count(cluster) %>%
+  ungroup() %>% 
+  mutate(percent = round((n/sum(n)*100), 1)) %>%
+  complete(.,cluster = 0:74, fill = list(n = 0, percent = 0)) %>% 
+  inner_join(., TF_network_clusters_count) 
+
+repressed_fishers_prep <- inner_join_clusters_repressed_count %>% 
+  mutate(fishers_col2 = sum(n) - n,
+         fishers_col4 = sum(cluster_number) - cluster_number) %>% 
+  dplyr::select(n, cluster_number, fishers_col2, fishers_col4) %>% 
+  dplyr::rename(fishers_col1 = n,
+                fishers_col3 = cluster_number) %>% 
+  relocate(fishers_col2, .after = fishers_col1)
+
+repressed_fishers <- repressed_fishers_prep %>% 
+  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$estimate))
+
+colnames(repressed_fishers)[5] <- "Odds_Ratio"
+
+repressed_fishers_p <- repressed_fishers_prep %>% 
+  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$p.value)) 
+
+colnames(repressed_fishers_p)[5] <- "p_value"
+
+repressed_fishers_Odds <- repressed_fishers %>% 
+  dplyr::select(Odds_Ratio) %>% 
+  round(2)
+
+repressed_fishers_pval <- repressed_fishers_p %>% 
+  dplyr::select(p_value)
+
+repressed_fishers_Odds_pval <- inner_join_clusters_repressed_count %>% 
+  bind_cols(repressed_fishers_Odds, repressed_fishers_pval) %>% 
+  dplyr::rename(number_in_cluster = n)
+
+#write_csv(repressed_fishers_Odds_pval, 'repressed_fishers_Odds_pval.csv')
+
+repressed_fishers_Odds_pval_heatmap1 <- repressed_fishers_Odds_pval %>%
+  mutate(time_points = "repressed") %>% 
+  dplyr::select(cluster, Odds_Ratio, time_points) %>% 
+  mutate(cluster=factor(cluster),
+         time_points =factor(time_points),
+         Enrichfactor=cut(Odds_Ratio, breaks=c(-1, 1, 3, 5, 7, max(Odds_Ratio)), labels=c("0-1","1-3","3-5","5-7",">7")),
+         Enrichfactor=factor(as.character(Enrichfactor),levels=rev(levels(Enrichfactor))))
+
+repressed_fishers_Odds_pval_heatmap2 <- repressed_fishers_Odds_pval_heatmap1 %>% 
+  ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
+  #ggplot(aes(x = cluster, y= time_points, fill= Enrichfactor))+
+  geom_tile(colour="grey30",size=0.3, width = 2.5) +
+  guides(fill=guide_legend(title="Enrichment")) +
+  labs(x="",y="Cluster") +
+  scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
+  scale_x_discrete(expand=c(0,0)) +
+  scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c'))) +
+  coord_fixed(ratio=0.75) +
+  theme_grey() +
+  theme(legend.position = "right",legend.direction = "vertical",
+        legend.title = element_text(colour = 'grey30', size = 14),
+        legend.margin = margin(grid::unit(0,"cm")),
+        legend.text = element_text(colour = 'grey30',size = 14),
+        legend.key.height = grid::unit(0.8,"cm"),
+        legend.key.width = grid::unit(0.8,"cm"),
+        axis.text.x = element_text(size = 14,colour = 'grey30',angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_text(size = 14, vjust = 0.2,colour = 'grey30'),
+        axis.title.y = element_text(size = 14, colour = 'grey30'),
+        axis.ticks = element_line(size = 0.4),
+        plot.background = element_blank(),
+        panel.border = element_blank())
+#       #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
+#       plot.title = element_text(colour = 'grey30', size = 10, face = "bold", hjust = 1)) + 
+# ggtitle('Repressed in Col-0') 
+
+repressed_fishers_Odds_pval_heatmap2
+
+# *8.2 activated----
+
+inner_join_clusters_activated <- inner_join(TF_network_clusters, activated_distinct_AGI)
+
+inner_join_clusters_activated_count <- inner_join_clusters_activated %>%
+  group_by(cluster) %>%
+  count(cluster) %>%
+  ungroup() %>% 
+  mutate(percent = round((n/sum(n)*100), 1)) %>%
+  complete(.,cluster = 0:74, fill = list(n = 0, percent = 0)) %>% 
+  inner_join(., TF_network_clusters_count) 
+
+activated_fishers_prep <- inner_join_clusters_activated_count %>% 
+  mutate(fishers_col2 = sum(n) - n,
+         fishers_col4 = sum(cluster_number) - cluster_number) %>% 
+  dplyr::select(n, cluster_number, fishers_col2, fishers_col4) %>% 
+  dplyr::rename(fishers_col1 = n,
+                fishers_col3 = cluster_number) %>% 
+  relocate(fishers_col2, .after = fishers_col1)
+
+activated_fishers <- activated_fishers_prep %>% 
+  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$estimate))
+
+colnames(activated_fishers)[5] <- "Odds_Ratio"
+
+activated_fishers_p <- activated_fishers_prep %>% 
+  data.frame(apply(., 1, function(x) fisher.test(matrix(x, nr=2), alternative="greater")$p.value)) 
+
+colnames(activated_fishers_p)[5] <- "p_value"
+
+activated_fishers_Odds <- activated_fishers %>% 
+  dplyr::select(Odds_Ratio) %>% 
+  round(2)
+
+activated_fishers_pval <- activated_fishers_p %>% 
+  dplyr::select(p_value)
+
+activated_fishers_Odds_pval <- inner_join_clusters_activated_count %>% 
+  bind_cols(activated_fishers_Odds, activated_fishers_pval) %>% 
+  dplyr::rename(number_in_cluster = n)
+
+# write_csv(activated_fishers_Odds_pval, 'activated_fishers_Odds_pval.csv')
+
+activated_fishers_Odds_pval_heatmap1 <- activated_fishers_Odds_pval %>%
+  mutate(time_points = "activated") %>% 
+  dplyr::select(cluster, Odds_Ratio, time_points) %>% 
+  mutate(cluster=factor(cluster),
+         time_points =factor(time_points),
+         Enrichfactor=cut(Odds_Ratio, breaks=c(-1, 1, 3, 5, 7, max(Odds_Ratio)), labels=c("0-1","1-3","3-5","5-7",">7")),
+         Enrichfactor=factor(as.character(Enrichfactor),levels=rev(levels(Enrichfactor))))
+
+activated_fishers_Odds_pval_heatmap2 <- activated_fishers_Odds_pval_heatmap1 %>% 
+  ggplot(aes(x = time_points, y= cluster, fill= Enrichfactor))+
+  geom_tile(colour="grey30",size=0.3, width = 2.5) +
+  guides(fill=guide_legend(title="Enrichment")) +
+  labs(x="",y="") +
+  scale_y_discrete(expand=c(0,0), breaks=c("0","5","10","15","20","25","30","35","40","45","50","55","60","65","70")) +
+  scale_x_discrete(expand=c(0,0)) +
+  scale_fill_manual(values=rev(c('#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#810f7c'))) +
+  coord_fixed(ratio=0.75) +
+  theme_grey() +
+  theme(legend.position = "right",legend.direction = "vertical",
+        legend.title = element_text(colour = 'grey30', size = 14),
+        legend.margin = margin(grid::unit(0,"cm")),
+        legend.text = element_text(colour = 'grey30',size = 14),
+        legend.key.height = grid::unit(0.8,"cm"),
+        legend.key.width = grid::unit(0.8,"cm"),
+        axis.text.x = element_text(size = 14,colour = 'grey30',angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_blank(),
+        axis.ticks = element_line(size = 0.4),
+        plot.background = element_blank(),
+        panel.border = element_blank(),
+        #plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
+        #plot.title = element_text(colour = 'grey30', size = 10, face = "bold"),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+activated_fishers_Odds_pval_heatmap2
+
+# *8.3 patched plots----
+# patch_plot3 <- TF_cluster_sizes_plot + (repressed_fishers_Odds_pval_heatmap2 + activated_fishers_Odds_pval_heatmap2 + plot_layout(ncol = 2) + plot_layout(guides = "collect"))
+# patch_plot3
+
+patch_plot4 <- TF_cluster_sizes_plot + repressed_fishers_Odds_pval_heatmap2 + activated_fishers_Odds_pval_heatmap2 + plot_layout(guides = "collect")
+patch_plot4
+
+ggsave(patch_plot4, filename="patch_plot4.png", height = 9, width = 5, units = "in", dpi = 300)
+
+# 9 z-score plots on h0-24 repressed and activated sets--------
+# *9.1 cluster 9----
+
+# get cluster 9 genes
+# this is just gene_IDs
+cluster9_repressed <- inner_join_clusters_repressed %>% 
+  filter(cluster %in% '9')
+
+repressed_distinct2 <- repressed_distinct %>% 
+  dplyr::select(-cluster)
+
+# get the associated isoforms
+cluster9_genes_isoforms_represssed <- repressed_distinct2 %>% 
+  inner_join(cluster9_repressed, by= 'gene_ID') %>% 
+  dplyr::select(-gene_ID)
+
+# write_csv(cluster9_genes_isoforms_represssed, 'cluster9_genes_isoforms_represssed.csv')
+
+# write the just gene_IDs to file
+# write_csv(cluster9_repressed, 'cluster9_repressed.csv')
+
+# get gene descriptions from TAIR add to the 'genes_ID' file then read back in
+cluster9_gene_ids_repressed <- read_csv('./00_raw_data/cluster9_repressed_with_gene_IDs.csv')
+
+cluster9_repressed_with_gene_IDs <- cluster9_gene_ids_repressed %>%
+  inner_join(cluster9_repressed, by= 'gene_ID') %>%
+  dplyr::select(-c(2, 4, 7))
+
+# write_csv(cluster9_repressed_with_gene_IDs, 'cluster9_repressed_with_gene_IDs.csv')
+
+#cluster9_repressed_isoforms
+cluster9_repressed_isoforms_z_scores <- cluster9_genes_isoforms_represssed %>% 
+  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
+  dplyr::select(-(c(2,23))) %>% 
+  pivot_longer(cols= Col_T9:rve2_T18,
+               names_to='time_point',
+               values_to='TPM') %>% 
+  group_by(Isoform) %>% 
+  mutate(z_score = scale(TPM)) %>% 
+  ungroup() %>%
+  group_by(time_point) %>% 
+  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
+  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
+                          grepl('_T10', time_point) ~ 3,
+                          grepl('_T11', time_point) ~ 6,
+                          grepl('_T12', time_point) ~ 7.5,
+                          grepl('_T13', time_point) ~ 9,
+                          grepl('_T14', time_point) ~ 12,
+                          grepl('_T15', time_point) ~ 15,
+                          grepl('_T16', time_point) ~ 18,
+                          grepl('_T17', time_point) ~ 21,
+                          TRUE ~ 24),
+         genotype = case_when(grepl('Col', time_point) ~ 'Col',
+                              TRUE ~ 'rve')) %>% 
+  arrange(time) %>%
+  ggplot(aes(time, mean)) +          
+  geom_line(aes(color = genotype), size = 1.5) + 
+  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
+  scale_x_continuous(breaks = seq(0, 24, 3)) +
+  theme_light(base_family = 'Arial',
+              base_size = 14) +
+  xlab('h after cooling (day 2)') +
+  ylab('mean z-score') +
+  theme(legend.position = c(0.25, 0.75),
+        legend.background = element_rect(linewidth=0.8, linetype="solid", 
+                                         colour ="grey30"),
+        legend.title = element_blank()) +
+  ggtitle('Cluster 9', subtitle = '98 isoforms (82 gene loci)')
+
+ggsave('cluster9_repressed_isoforms_z_scores.png', height = 5, width = 4, units = 'in')
+
+cluster9_repressed_isoforms_z_scores
+
+# *9.2 cluster 20----
+
+# get cluster 20 genes
+# this is just gene_IDs
+cluster20_repressed <- inner_join_clusters_repressed %>% 
+  filter(cluster %in% '20')
+
+repressed_distinct2 <- repressed_distinct %>% 
+  dplyr::select(-cluster)
+
+# get the associated isoforms
+cluster20_genes_isoforms_represssed <- repressed_distinct2 %>% 
+  inner_join(cluster20_repressed, by= 'gene_ID') %>% 
+  dplyr::select(-gene_ID)
+
+# write_csv(cluster20_genes_isoforms_represssed, 'cluster20_genes_isoforms_represssed.csv')
+
+# write the just gene_IDs to file
+# write_csv(cluster20_repressed, 'cluster20_repressed.csv')
+
+# get gene descriptions from TAIR add to the 'genes_ID' file then read back in
+cluster20_gene_ids_repressed <- read_csv('./00_raw_data/cluster20_repressed_with_gene_IDs.csv')
+
+cluster20_repressed_with_gene_IDs <- cluster20_gene_ids_repressed %>%
+  inner_join(cluster20_repressed, by= 'gene_ID') %>%
+  dplyr::select(-c(2, 4, 7))
+
+# write_csv(cluster20_repressed_with_gene_IDs, 'cluster20_repressed_with_gene_IDs.csv')
+
+#cluster20_repressed_isoforms
+cluster20_repressed_isoforms_z_scores <- cluster20_genes_isoforms_represssed %>% 
+  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
+  dplyr::select(-(c(2,23))) %>% 
+  pivot_longer(cols= Col_T9:rve2_T18,
+               names_to='time_point',
+               values_to='TPM') %>% 
+  group_by(Isoform) %>% 
+  mutate(z_score = scale(TPM)) %>% 
+  ungroup() %>%
+  group_by(time_point) %>% 
+  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
+  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
+                          grepl('_T10', time_point) ~ 3,
+                          grepl('_T11', time_point) ~ 6,
+                          grepl('_T12', time_point) ~ 7.5,
+                          grepl('_T13', time_point) ~ 9,
+                          grepl('_T14', time_point) ~ 12,
+                          grepl('_T15', time_point) ~ 15,
+                          grepl('_T16', time_point) ~ 18,
+                          grepl('_T17', time_point) ~ 21,
+                          TRUE ~ 24),
+         genotype = case_when(grepl('Col', time_point) ~ 'Col',
+                              TRUE ~ 'rve')) %>% 
+  arrange(time) %>%
+  ggplot(aes(time, mean)) +          
+  geom_line(aes(color = genotype), size = 1.5) + 
+  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
+  scale_x_continuous(breaks = seq(0, 24, 3)) +
+  theme_light(base_family = 'Arial',
+              base_size = 14) +
+  xlab('h after cooling (day 2)') +
+  ylab('mean z-score') +
+  theme(legend.position = c(0.25, 0.75),
+        legend.background = element_rect(linewidth=0.8, linetype="solid", 
+                                         colour ="grey30"),
+        legend.title = element_blank()) +
+  ggtitle('Cluster 20', subtitle = '53 isoforms (45 gene loci)')
+
+ggsave('cluster20_repressed_isoforms_z_scores.png', height = 5, width = 4, units = 'in')
+
+cluster20_repressed_isoforms_z_scores
+
+# *9.3 cluster 25----
+# get cluster 25 genes
+# this is just gene_IDs
+cluster25_repressed <- inner_join_clusters_repressed %>% 
+  filter(cluster %in% '25')
+
+repressed_distinct2 <- repressed_distinct %>% 
+  dplyr::select(-cluster)
+
+# get the associated isoforms
+cluster25_genes_isoforms_represssed <- repressed_distinct2 %>% 
+  inner_join(cluster25_repressed, by= 'gene_ID') %>% 
+  dplyr::select(-gene_ID)
+
+# write_csv(cluster25_genes_isoforms_represssed, 'cluster25_genes_isoforms_represssed.csv')
+
+# write the just gene_IDs to file
+# write_csv(cluster25_repressed, 'cluster25_repressed.csv')
+
+# get gene descriptions from TAIR add to the 'genes_ID' file then read back in
+cluster25_gene_ids_repressed <- read_csv('./00_raw_data/cluster25_repressed_with_gene_IDs.csv')
+
+cluster25_repressed_with_gene_IDs <- cluster25_gene_ids_repressed %>%
+  inner_join(cluster25_repressed, by= 'gene_ID') %>%
+  dplyr::select(-c(2, 4, 7))
+
+# write_csv(cluster25_repressed_with_gene_IDs, 'cluster25_repressed_with_gene_IDs.csv')
+
+#cluster25_repressed_isoforms
+cluster25_repressed_isoforms_z_scores <- cluster25_genes_isoforms_represssed %>% 
+  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>% 
+  dplyr::select(-(c(2,23))) %>% 
+  pivot_longer(cols= Col_T9:rve2_T18,
+               names_to='time_point',
+               values_to='TPM') %>% 
+  group_by(Isoform) %>% 
+  mutate(z_score = scale(TPM)) %>% 
+  ungroup() %>%
+  group_by(time_point) %>% 
+  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
+  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
+                          grepl('_T10', time_point) ~ 3,
+                          grepl('_T11', time_point) ~ 6,
+                          grepl('_T12', time_point) ~ 7.5,
+                          grepl('_T13', time_point) ~ 9,
+                          grepl('_T14', time_point) ~ 12,
+                          grepl('_T15', time_point) ~ 15,
+                          grepl('_T16', time_point) ~ 18,
+                          grepl('_T17', time_point) ~ 21,
+                          TRUE ~ 24),
+         genotype = case_when(grepl('Col', time_point) ~ 'Col',
+                              TRUE ~ 'rve')) %>% 
+  arrange(time) %>%
+  ggplot(aes(time, mean)) +          
+  geom_line(aes(color = genotype), size = 1.5) + 
+  scale_color_manual(values = c("grey30", "#DA777E"), labels=c('Col-0', 'rve2-2')) +
+  scale_x_continuous(breaks = seq(0, 24, 3)) +
+  theme_light(base_family = 'Arial',
+              base_size = 14) +
+  xlab('h after cooling (day 2)') +
+  ylab('mean z-score') +
+  theme(legend.position = c(0.25, 0.75),
+        legend.background = element_rect(linewidth=0.8, linetype="solid", 
+                                         colour ="grey30"),
+        legend.title = element_blank()) +
+  ggtitle('Cluster 25', subtitle = '37 isoforms (32 gene loci)')
+
+ggsave('cluster25_repressed_isoforms_z_scores.png', height = 5, width = 4, units = 'in')
+
+cluster25_repressed_isoforms_z_scores 
+
+# *9.4 cluster 17----
+# get cluster 17 genes
+# this is just gene_IDs
+cluster17_activated <- inner_join_clusters_activated %>% 
+  filter(cluster %in% '17')
+
+activated_distinct2 <- activated_distinct %>% 
+  dplyr::select(-cluster)
+
+# get the associated isoforms
+cluster17_genes_isoforms_activated <- activated_distinct2 %>% 
+  inner_join(cluster17_activated, by= 'gene_ID') %>% 
+  dplyr::select(-gene_ID)
+
+# write_csv(cluster17_genes_isoforms_activated, 'cluster17_genes_isoforms_activated.csv')
+
+# write the just gene_IDs to file
+# write_csv(cluster17_activated, 'cluster17_activated.csv')
+
+# get gene descriptions from TAIR add to the 'genes_ID' file then read back in
+cluster17_gene_ids_activated <- read_csv('./00_raw_data/cluster17_activated_with_gene_IDs.csv')
+
+cluster17_activated_with_gene_IDs <- cluster17_gene_ids_activated %>%
+  inner_join(cluster17_activated, by= 'gene_ID') %>%
+  dplyr::select(-c(2, 4, 7))
+
+# write_csv(cluster17_activated_with_gene_IDs, 'cluster17_activated_with_gene_IDs.csv')
+
+#cluster17_activated_isoforms
+
+cluster17_activated_isoforms_z_scores <- cluster17_genes_isoforms_activated %>% 
+  inner_join(transcript_RNAseq_means_select_filtered_low, by = 'Isoform') %>%
+  dplyr::select(-(c(2,23))) %>% 
+  pivot_longer(cols= Col_T9:rve2_T18,
+               names_to='time_point',
+               values_to='TPM') %>% 
+  group_by(Isoform) %>% 
+  mutate(z_score = scale(TPM)) %>% 
+  ungroup() %>%
+  group_by(time_point) %>% 
+  summarise(mean=mean(z_score), sd=sd(z_score)) %>% 
+  mutate(time = case_when(grepl('_T9', time_point) ~ 0,
+                          grepl('_T10', time_point) ~ 3,
+                          grepl('_T11', time_point) ~ 6,
+                          grepl('_T12', time_point) ~ 7.5,
+                          grepl('_T13', time_point) ~ 9,
+                          grepl('_T14', time_point) ~ 12,
+                          grepl('_T15', time_point) ~ 15,
+                          grepl('_T16', time_point) ~ 18,
+                          grepl('_T17', time_point) ~ 21,
+                          TRUE ~ 24),
+         genotype = case_when(grepl('Col', time_point) ~ 'Col',
+                              TRUE ~ 'rve')) %>% 
+  arrange(time) %>%
+  ggplot(aes(time, mean)) +          
+  geom_line(aes(color = genotype), size = 1.5) + 
+  scale_color_manual(values = c("grey30", "#B3E3A0"), labels=c('Col-0', 'rve2-2')) +
+  scale_x_continuous(breaks = seq(0, 24, 3)) +
+  theme_light(base_family = 'Arial',
+              base_size = 14) +
+  xlab('h after cooling (day 2)') +
+  ylab('mean z-score') +
+  theme(legend.position = c(0.25, 0.75),
+        legend.background = element_rect(linewidth=0.8, linetype="solid", 
+                                         colour ="grey30"),
+        legend.title = element_blank()) +
+  ggtitle('Cluster 17', subtitle = '31 isoforms (31 gene loci)')
+
+ggsave('cluster17_activated_isoforms_z_scores.png', height = 5, width = 4, units = 'in')
+
+cluster17_activated_isoforms_z_scores
+
+
+
